@@ -1,5 +1,5 @@
 # Ignore specific file
-a.txt
+OPENAI_API_KEY.txt
 
 # Ignore virtual environment
 llm/
