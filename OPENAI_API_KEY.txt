@@ -1,0 +1,11 @@
+openai-api-key:
+sk-proj-HG4Xlh8YQomfXemwUkOJT3BlbkFJPqUGMIbgieCFk2zIb2VP
+
+langChain key:
+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
+
+anthropic-key:
+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
+
+tavliy_api_key:
+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

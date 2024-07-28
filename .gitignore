@@ -1,2 +1,5 @@
-OPENAI_API_KEY.txt
+# Ignore specific file
+a.txt
+
+# Ignore virtual environment
 llm/
