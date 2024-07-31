@@ -14,11 +14,15 @@ from langchain.tools import tool
 import time
 
 # set input (each prompt = 1 task)
-sequence = read_data("input.txt")
-model_name = "gpt-3.5-turbo"
-prompt_1 = "extract the top 3 features from the following reviews about a prdocut. \n {reviews}"
-prompt_2 = "Evaluate the quality of the product based on the following reviews: (only give one single number from 1-10) \n {reviews}"
-prompts = [prompt_1, prompt_2]
+sequence = read_data("input.txt")[0]
+model_name = "gpt-4-turbo"
+task_1 = "name the top 3 features from the following reviews about a prdocut.\n {reviews}"
+task_2 = "only select one of [\"HIGH\", \"MEDIUM\", \"LOW\"] to estimate the quality of the product described by the following reviews: \n {reviews}"
+system_prompt_1 = "You only name the top 3 features of the product based on the reviews"
+system_prompt_2 = "You only choose one of [\"HIGH\", \"MEDIUM\", \"LOW\"] to estimate the quality of the product based on the reviews"
+task_combined = "name the top 3 features from the following reviews about a prdocut. Then, use those features to choose one of [\"HIGH\", \"MEDIUM\", \"LOW\"] to estimate the quality of the product. Here are the reviews: \n {reviews}"
+tasks = [task_1, task_2]
+#tasks = [task_combined]
 
 def call_single_llm(sequence, model_name, prompts):
     model = ChatOpenAI(model=model_name)
@@ -31,9 +35,9 @@ def call_single_llm(sequence, model_name, prompts):
 
 @tool
 def extract_features(query: str) -> str:
-    """extract the top 2 features from the input sequence of reviews\n"""
-    model = ChatOpenAI(model=model_name)
-    prompt = ChatPromptTemplate.from_template("extract the top-3 features of the product that has been described by the following reviews: {reviews}")
+    """Name the top-3 features"""
+    model = ChatOpenAI(model=model_name, temperature=0.1)
+    prompt = ChatPromptTemplate.from_template(task_1)
     output_parser = StrOutputParser()
 
     chain = prompt | model | output_parser
@@ -43,9 +47,9 @@ def extract_features(query: str) -> str:
 
 @tool
 def estimate_quality(query: str) -> str:
-    """estimate the numerical quality of a product from 1-10 based on the input sequence of reviews\n"""
+    """Select one option from [HIGH, MEDUMN, LOW] as the product quality"""
     model = ChatOpenAI(model=model_name)
-    prompt = ChatPromptTemplate.from_template("only return a numerical value from 1-10 that estimates the quality of this product based on the following reviews: {reviews}")
+    prompt = ChatPromptTemplate.from_template(task_2)
     output_parser = StrOutputParser()
 
     chain = prompt | model | output_parser
@@ -71,6 +75,7 @@ def create_agent(llm: ChatOpenAI, tools: list, system_prompt: str):
     return executor
 
 def agent_node(state, agent, name):
+    state["messages"].append(HumanMessage(content="You might know the answer without running any code, but you should still use your tool to get the answer."))
     result = agent.invoke(state)
     return {"messages": [HumanMessage(content=result["output"], name=name)]}
 
@@ -145,15 +150,15 @@ def call_supervision_llm(sequence, model_name, prompts):
         | model.bind_functions(functions=[function_def], function_call="route")
         | JsonOutputFunctionsParser())
     
-    feature_agent = create_agent(model, [extract_features], "You are only a top-3 feature extractor.")
-    feature_node = functools.partial(agent_node, agent=feature_agent, name="feature-extractor")
+    feature_agent = create_agent(model, [extract_features], system_prompt_1)
+    feature_node = functools.partial(agent_node, agent=feature_agent, name=members[0])
 
     quality_agent = create_agent(
         model,
         [estimate_quality],
-        "You evaluate the quality of a product and only return one single number from 1-10 and don't print anything else",
+        system_prompt_2,
     )
-    quality_node = functools.partial(agent_node, agent=quality_agent, name="quality-estimator")
+    quality_node = functools.partial(agent_node, agent=quality_agent, name=members[1])
 
     graph = build_graph(feature_node, quality_node, supervisor_chain, members)
     messages = []
@@ -166,11 +171,11 @@ def call_supervision_llm(sequence, model_name, prompts):
             print("----")
 
 single_llm_start_time = time.time()
-call_single_llm(sequence, model_name, prompts)
+call_single_llm(sequence, model_name, tasks)
 single_llm_time = time.time() - single_llm_start_time
 
 supervision_llm_start_time = time.time()
-call_supervision_llm(sequence, model_name, prompts)
+call_supervision_llm(sequence, model_name, tasks)
 supervision_llm_time = time.time() - supervision_llm_start_time
 
 print("Time taken for single LLM: ", single_llm_time)

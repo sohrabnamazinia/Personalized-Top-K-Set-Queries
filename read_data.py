@@ -1,20 +1,21 @@
 # Read input.txt and convert it to a list of paragraphs
 def read_data(filename, a=0, b=-1):
     with open(filename, 'r') as file:
-        # Read the entire content of the file
         content = file.read()
-        # Split content by double newlines to separate paragraphs
-        paragraphs = content.split('\n\n')
-        # Strip leading/trailing whitespace from each paragraph
-        result = [para.strip() for para in paragraphs if para.strip()]
-        if b == -1: 
-            b = len(result)
-        return result[a:b + 1]
+
+    products_reviews = content.strip().split('\n\n')
+    reviews_2d_list = []
+
+    for product_reviews in products_reviews:
+        reviews = product_reviews.strip().split('\n')
+        reviews_2d_list.append(reviews)
+
+    return reviews_2d_list
 
 # # Define the path to the input file
-# filename = 'input.txt'
+filename = 'input.txt'
 # # Get the list of paragraphs
-# sequence = read_paragraphs(filename)
+#reviews = read_data(filename)
 
 # # Print the sequence for verification
-# print(sequence)
+#print(reviews[1])
