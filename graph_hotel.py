@@ -1,5 +1,5 @@
 from langchain_openai import ChatOpenAI
-from read_data_hotel_reviews import read_data
+from read_data_hotel_reviews import read_data, read_data_fake
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser
 from langchain.agents import AgentExecutor, create_openai_tools_agent
@@ -16,7 +16,8 @@ from langchain_core.pydantic_v1 import BaseModel, Field
 
 model_name = "gpt-4-turbo"
 hotel_name = "Azul Beach Hotel By Karisma Gourmet Inclusive"
-features = ["distance from attraction(s)", "cleanness", "final_score"]
+#hotel_name = "XXX"
+features = ["distance_from_attractions", "cleanness", "final_score"]
 task = "Rate the hotel that has been described by the following reviews based on \"{features}\": {reviews}"
 prompt_distance_from_attraction = "Rate the hotel that has been described by the following reviews only based on \"distance from attraction\": {reviews}"
 prompt_cleanness = "Rate the hotel that has been described by the following reviews only based on \"cleanness\": {reviews}"
@@ -25,23 +26,36 @@ system_prompt_cleanness = "You only return a value in range 0-1 to rate the hote
 system_prompt_compute_final_score = "You only compute final score of the hotel based on the individual scores already computed"
 prompts = [task]
 
+class Rating(BaseModel):
+    rate : int = Field("The rating in the range 0-1") 
+    
+# @tool
+# def compute_final_score(scores: list):
+#     """Compute the final score for a hotel"""
+#     avg_score = 0
+#     for score in scores:
+#         avg_score += int(score)
+#     avg_score /= (len(features) - 1)
+#     return avg_score
 @tool
 def compute_final_score(scores: list):
     """Compute the final score for a hotel"""
-    avg_score = 0
-    for score in scores:
-        avg_score += int(score)
-    avg_score /= (len(features) - 1)
-    return avg_score
+    model = ChatOpenAI(model=model_name)
+    prompt = ChatPromptTemplate.from_template("Sum all the individual scores to get the final score of the hotel: {scores}")
+    output_parser = StrOutputParser()
+
+    chain = prompt | model | output_parser
+
+    result = chain.invoke({"scores": scores})
+    return result
 
 @tool
 def rate_distance_from_attraction(reviews: list):
     """Rate the hotel in a scale of 0-1 only based on its distance from attraction(s)"""
-    model = ChatOpenAI(model=model_name)
+    model = ChatOpenAI(model=model_name).with_structured_output(Rating)
     prompt = ChatPromptTemplate.from_template(prompt_distance_from_attraction)
-    output_parser = StrOutputParser()
-
-    chain = prompt | model | output_parser
+    
+    chain = prompt | model 
 
     result = chain.invoke({"reviews": str(reviews)})
     return result
@@ -49,11 +63,10 @@ def rate_distance_from_attraction(reviews: list):
 @tool
 def rate_cleanness(reviews: list):
     """Rate the hotel in a scale of 0-1 only based on its cleanness"""
-    model = ChatOpenAI(model=model_name)
+    model = ChatOpenAI(model=model_name).with_structured_output(Rating)
     prompt = ChatPromptTemplate.from_template(prompt_cleanness)
-    output_parser = StrOutputParser()
 
-    chain = prompt | model | output_parser
+    chain = prompt | model 
 
     result = chain.invoke({"reviews": str(reviews)})
     return result
@@ -75,7 +88,7 @@ def create_agent(llm: ChatOpenAI, tools: list, system_prompt: str):
     return executor
 
 def agent_node(state, agent, name):
-    state["messages"].append(HumanMessage(content="You might know the answer without calling any tool, but you should still only use your tool to get the answer."))
+    state["messages"].append(HumanMessage(content="You might know the answer without calling any tool, but you should only use your tool to get the answer."))
     result = agent.invoke(state)
     return {"messages": [HumanMessage(content=result["output"], name=name)]}
 
@@ -121,7 +134,7 @@ def call_model(reviews_dict, hotel_name):
     messages = []
     for prompt in prompts:
         prompt = ChatPromptTemplate.from_template(prompt)
-        messages.append(prompt.invoke({"reviews" : str(reviews), "features" : str(features)}).to_messages()[0])
+        messages.append(prompt.invoke({"reviews" : str(reviews), "features" : str(features[:-1])}).to_messages()[0])
     for s in graph.stream({"messages": messages}):
         if "__end__" not in s:
             print(s)

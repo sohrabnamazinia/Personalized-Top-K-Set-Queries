@@ -2,18 +2,25 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.pydantic_v1 import BaseModel, Field
 
+
+class Counter(BaseModel):
+    rate : int = Field("The rating in the range 0-1") 
+
+words = ["AB", "CD", "EF"]
 model = ChatOpenAI(model="gpt-4")
-model.bind_functions()
-parser = StrOutputParser()
+model = model.with_structured_output(Counter)
 
-system_template = "Based on the user description of an {category}, predict in one word what specific kind of {category} it is?"
-messages = [("system", system_template), ("user", "{input}")]
-prompt_template = ChatPromptTemplate.from_messages(messages)
+prompt = ChatPromptTemplate.from_template("How many words you can see totally in here: {words}")
+output_parser = StrOutputParser()
 
-chain = prompt_template | model | parser
-result = chain.invoke({"category": "car brand", "input": "it is high-tech"})
+chain = prompt | model
+
+result = chain.invoke({"words": str(words)})
+
 print(result)
 
+    
 
 

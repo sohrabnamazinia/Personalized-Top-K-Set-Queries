@@ -11,5 +11,10 @@ def read_data(input_file="7282_1.csv", n=1000):
     # total_reviews = sum(len(review_list) for review_list in reviews.values())
     return reviews
 
+def read_data_fake():
+    reviews = ["This hotel is perfect. It is so close to the great fall", "the hotel is good but expensive", "the hotel was not very clean"]
+    result = {"XXX" : reviews}
+    return result
+
 # r = read_data()
 # print(r.keys())
