@@ -15,19 +15,20 @@ import time
 from langchain_core.pydantic_v1 import BaseModel, Field
 
 model_name = "gpt-4-turbo"
-hotel_name = "Azul Beach Hotel By Karisma Gourmet Inclusive"
+hotel_name_1 = "Azul Beach Hotel By Karisma Gourmet Inclusive"
 #hotel_name = "XXX"
+hotel_names = [hotel_name_1]
 features = ["distance_from_attractions", "cleanness", "final_score"]
 task = "Rate the hotel that has been described by the following reviews based on \"{features}\": {reviews}"
 prompt_distance_from_attraction = "Rate the hotel that has been described by the following reviews only based on \"distance from attraction\": {reviews}"
 prompt_cleanness = "Rate the hotel that has been described by the following reviews only based on \"cleanness\": {reviews}"
-system_prompt_distance_from_attraction = "You only return a value in range 0-1 to rate the hotel only based on its distance from attraction(s)"
-system_prompt_cleanness = "You only return a value in range 0-1 to rate the hotel only based on its cleanness"
+system_prompt_distance_from_attraction = "You only return a value in range 0-10 to rate the hotel only based on its distance from attraction(s)"
+system_prompt_cleanness = "You only return a value in range 0-10 to rate the hotel only based on its cleanness"
 system_prompt_compute_final_score = "You only compute final score of the hotel based on the individual scores already computed"
 prompts = [task]
 
 class Rating(BaseModel):
-    rate : int = Field("The rating in the range 0-1") 
+    rate : int = Field("The rating in the range 0-10") 
     
 # @tool
 # def compute_final_score(scores: list):
@@ -41,7 +42,7 @@ class Rating(BaseModel):
 def compute_final_score(scores: list):
     """Compute the final score for a hotel"""
     model = ChatOpenAI(model=model_name)
-    prompt = ChatPromptTemplate.from_template("Sum all the individual scores to get the final score of the hotel: {scores}")
+    prompt = ChatPromptTemplate.from_template("Average all the individual scores and normalize it to the range [0-1] to get the final score of the hotel: {scores}")
     output_parser = StrOutputParser()
 
     chain = prompt | model | output_parser
@@ -51,7 +52,7 @@ def compute_final_score(scores: list):
 
 @tool
 def rate_distance_from_attraction(reviews: list):
-    """Rate the hotel in a scale of 0-1 only based on its distance from attraction(s)"""
+    """Rate the hotel in a scale of 0-10 only based on its distance from attraction(s)"""
     model = ChatOpenAI(model=model_name).with_structured_output(Rating)
     prompt = ChatPromptTemplate.from_template(prompt_distance_from_attraction)
     
@@ -62,7 +63,7 @@ def rate_distance_from_attraction(reviews: list):
 
 @tool
 def rate_cleanness(reviews: list):
-    """Rate the hotel in a scale of 0-1 only based on its cleanness"""
+    """Rate the hotel in a scale of 0-10 only based on its cleanness"""
     model = ChatOpenAI(model=model_name).with_structured_output(Rating)
     prompt = ChatPromptTemplate.from_template(prompt_cleanness)
 
@@ -126,20 +127,27 @@ def build_graph(nodes):
     graph = graph_builder.compile()
     return graph
 
-def call_model(reviews_dict, hotel_name):
-    nodes = build_nodes()
-    graph = build_graph(nodes)
-    reviews = reviews_dict[hotel_name]
+def call_model(reviews_dict, hotel_names, n_reviews=1):
+    for hotel_name in hotel_names:
+        nodes = build_nodes()
+        graph = build_graph(nodes)
+        reviews = reviews_dict[hotel_name][:n_reviews]
+        print("*****************************************")
+        print("HOTEL NAME: ", hotel_name)
+        print("REVIEWS: ", str(reviews))
+        messages = []
+        for prompt in prompts:
+            prompt = ChatPromptTemplate.from_template(prompt)
+            messages.append(prompt.invoke({"reviews" : str(reviews), "features" : str(features[:-1])}).to_messages()[0])
+        for s in graph.stream({"messages": messages}):
+            if "__end__" not in s:
+                print(s)
+                print("----")
 
-    messages = []
-    for prompt in prompts:
-        prompt = ChatPromptTemplate.from_template(prompt)
-        messages.append(prompt.invoke({"reviews" : str(reviews), "features" : str(features[:-1])}).to_messages()[0])
-    for s in graph.stream({"messages": messages}):
-        if "__end__" not in s:
-            print(s)
-            print("----")
 
-
+n_reviews = 1
+n_hotels = 4
 reviews_dict = read_data()
-call_model(reviews_dict, hotel_name)
+#reviews_dict = read_data_fake()
+hotel_names = list(reviews_dict.keys())[:n_hotels]
+call_model(reviews_dict, hotel_names, n_reviews)
