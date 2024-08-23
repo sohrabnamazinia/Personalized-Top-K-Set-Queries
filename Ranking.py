@@ -14,9 +14,6 @@ class Metric:
         else:
             raise IndexError("Index out of bounds")
     
-    def update_bounds(UBs, LBs, index):
-        pass
-        
     def __str__(self):
         return f"Table(name={self.name}, shape=({self.n}, {self.m}))\n{self.table}"
 
@@ -40,6 +37,29 @@ def choose_2(k):
     if k < 2:
         return 0  
     return k * (k - 1) // 2
+
+def compute_all_bounds_baseline(metrics, candidates_set):
+    relevance_table = metrics[0].table
+    diversity_table = metrics[1].table
+    k = len(next(iter(candidates_set)))
+    result = {}
+
+    for candidate, _ in candidates_set.items():
+        relevance_scores = [relevance_table[0, doc] for doc in candidate]
+        relevance_score = sum(relevance_scores) / k
+        
+        diversity_scores = 0
+        candidate_list = list(candidate)
+        for i in range(k):
+            for j in range(i + 1, k):
+                diversity_scores += (diversity_table[candidate_list[i], candidate_list[j]])
+        diversity_score = diversity_scores / choose_2(k)
+        
+        total_score = relevance_score + diversity_score
+        
+        result[candidate] = total_score
+    
+    return result
 
 def check_prune(tuple_1, tuple_2):
     candidate_1, bounds_1 = tuple_1[0], tuple_1[1]
@@ -95,9 +115,6 @@ def prune(candidates_set, updated_keys):
             candidates_set.pop(key)
     return candidates_set
 
-def compute_all_bounds_baseline():
-    pass
-
 def mock_table_diversity(table):
     table.table = np.round(np.random.random((table.n, table.m)), 1)
     mask = np.triu(np.ones((table.n, table.m)), k=1)
@@ -118,8 +135,15 @@ def find_top_k_naive(input_query, documents, k, metrics):
     # fill tables by mocking OR calling LLM for each cell
     mock_table_diversity(diversity_table)
     mock_table_relevance(relevance_table)
+
+    print("*****************************")
     print(relevance_table)
     print(diversity_table)
+    print("*****************************")
+
+    result = compute_all_bounds_baseline([relevance_table, diversity_table], candidates_set)
+    print("Baseline Approach - Exact scores:\n", result)
+    print("*****************************")
 
     for d in range(relevance_table.m):
         # update bounds
@@ -142,8 +166,8 @@ def find_top_k_naive(input_query, documents, k, metrics):
     return candidates_set
 
 input_query = ""
-n = 4
-k = 3
+n = 7
+k = 4
 metrics = ["relevance", "diversity"]
 documents = read_documents(n=n)
 result = find_top_k_naive(input_query, documents, k, metrics)
