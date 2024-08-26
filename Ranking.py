@@ -8,11 +8,24 @@ class Metric:
         self.n = n
         self.m = m
 
-    def Set(self, i: int, j: int, value: float):
+    def set(self, i: int, j: int, value: float):
         if 0 <= i < self.n and 0 <= j < self.m:
             self.table[i, j] = value
         else:
             raise IndexError("Index out of bounds")
+    
+    def set_all(self, table):
+        if table.shape == (self.n, self.m):
+            self.table = table
+        else:
+            raise IndexError("New Table has dimension conflict")
+
+    def set_all_random(self):
+        self.table = np.round(np.random.random((self.n, self.m)), 1)
+        if self.n > 1:
+            mask = np.triu(np.ones((self.n, self.m)), k=1)
+            self.table = np.where(mask, self.table, -1)
+
     
     def __str__(self):
         return f"Table(name={self.name}, shape=({self.n}, {self.m}))\n{self.table}"
@@ -77,8 +90,32 @@ def call_llm_diversity(d1, d2):
     pass
 
 # NOTE
-def find_top_k(documents, k):
-    pass
+def find_top_k(input_query, documents, k, metrics):
+    # init candidate set 
+    n = len(documents)
+    candidates_set = init_candidates_set(n, k, 0, len(metrics))
+    print(candidates_set)
+    # create tables
+    relevance_table = Metric(metrics[0], 1 ,n)
+    diversity_table = Metric(metrics[1], n ,n)
+
+    # relevance 
+    for d in range(n):
+        value = call_llm_relevance(input_query, d)
+        relevance_table.set(d, 1, value)
+        candidates_set, updated_candidates = update_lb_ub_relevance(candidates_set, d, value, k)
+    
+    while len(candidates_set) > 1:
+        i, j = choose_next_llm_diversity(diversity_table, candidates_set)
+        value = call_llm_diversity(i, j)
+        diversity_table.set(i, j, value)
+        candidates_set, updated_candidates = update_lb_ub_relevance(candidates_set, d, value, k)
+        candidates_set = prune(candidates_set, updated_candidates)
+
+    return candidates_set
+
+def choose_next_llm_diversity(diversity_table, candidates_set):
+    return 0, 0
 
 def update_lb_ub_relevance(candidates_set, d, value, k):
     updated_candidates = []
@@ -115,14 +152,6 @@ def prune(candidates_set, updated_keys):
             candidates_set.pop(key)
     return candidates_set
 
-def mock_table_diversity(table):
-    table.table = np.round(np.random.random((table.n, table.m)), 1)
-    mask = np.triu(np.ones((table.n, table.m)), k=1)
-    table.table = np.where(mask, table.table, -1)
-
-def mock_table_relevance(table):
-    table.table = np.round(np.random.random((table.n, table.m)), 1)
-
 def find_top_k_naive(input_query, documents, k, metrics):
     # init candidate set 
     n = len(documents)
@@ -133,8 +162,8 @@ def find_top_k_naive(input_query, documents, k, metrics):
     diversity_table = Metric(metrics[1], n ,n)
 
     # fill tables by mocking OR calling LLM for each cell
-    mock_table_diversity(diversity_table)
-    mock_table_relevance(relevance_table)
+    diversity_table.set_all_random()
+    relevance_table.set_all_random()
 
     print("*****************************")
     print(relevance_table)
@@ -166,8 +195,8 @@ def find_top_k_naive(input_query, documents, k, metrics):
     return candidates_set
 
 input_query = ""
-n = 7
-k = 4
+n = 3
+k = 2
 metrics = ["relevance", "diversity"]
 documents = read_documents(n=n)
 result = find_top_k_naive(input_query, documents, k, metrics)
