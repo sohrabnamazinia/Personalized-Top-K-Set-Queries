@@ -1,7 +1,15 @@
 import numpy as np
 import itertools
-import copy
+import time
+import datetime
 
+class TopKResult:
+    def __init__(self, algorithm, candidates_set, time, api_calls) -> None:
+        self.algorithm = algorithm
+        self.candidates_set = candidates_set
+        self.time = time
+        self.api_calls = api_calls
+    
 class Metric:
     def __init__(self, name: str, n: int, m: int):
         self.name = name
@@ -100,62 +108,67 @@ def check_prune(tuple_1, tuple_2):
 def call_all_llms_relevance(input_query, relevance_table, candidates_set, k, mocked_table = False):
     # relevance 
     n = relevance_table.m
-    mock_table = mocked_table != None
+    mock_table = mocked_table is not None
 
     for d in range(n):
         # check if llm should be mocked or not and get value based on this condition
         value = call_llm_relevance(input_query, d, mocked_table) if mock_table else call_llm_relevance(input_query, d)
-        relevance_table.set(d, 1, value)
+        relevance_table.set(0, d, value)
         candidates_set, updated_candidates = update_lb_ub_relevance(candidates_set, d, value, k)
     return candidates_set, updated_candidates
 
 # NOTE
 def call_llm_relevance(query, d, relevance_table = None):
     # Case: Mocked LLM - d is integer
-    if relevance_table != None:
-        return relevance_table[d]
+    if relevance_table is not None:
+        return relevance_table[0][d]
     
     # Case: Real LLM - d is the string document
 
 # NOTE
 def call_llm_diversity(d1, d2, diversity_table = None):
     # Case: Mocked LLM - d is integer
-    if diversity_table != None:
+    if diversity_table is not None:
         return diversity_table[d1][d2]
     
     # Case: Real LLM - d is the string document
 
 def find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables = None):
     # init candidates set and tables
+    start_time = time.time()
     n = len(documents)
     candidates_set = init_candidates_set(n, k, 0, len(metrics))
-    print(candidates_set)
     relevance_table = Metric(metrics[0], 1 ,n)
     diversity_table = Metric(metrics[1], n ,n)
-    mock_tables = mocked_tables != None
-    if mock_tables:
-        relevance_table.set_all(mocked_tables[0])
-        diversity_table.set_all(mocked_tables[1])
 
     # use all relevance llm calls
     candidates_set, _ = call_all_llms_relevance(input_query, relevance_table, candidates_set, k, mocked_tables[0])
     
     # algorithm
+    count = 0
     while len(candidates_set) > 1:
-        i, j = choose_next_llm_diversity(diversity_table, candidates_set)
+        pair = choose_next_llm_diversity(diversity_table, candidates_set)
+        if pair is not None: i, j = pair
+        else: break 
         value = call_llm_diversity(i, j, mocked_tables[1])
+        count += 1
         diversity_table.set(i, j, value)
         candidates_set, updated_candidates = update_lb_ub_diversity(candidates_set, (i, j), value, k)
         candidates_set = prune(candidates_set, updated_candidates)
-
-    return candidates_set
+    
+    print("*************************************")
+    print("Result - Min Uncertainty: \n", candidates_set)
+    print("Total number of calls: " , count)
+    duration = time.time() - start_time
+    return TopKResult(MIN_UNCERTAINTY, candidates_set, duration, count) 
 
 def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables = None):
     # init candidate set and tables
+    start_time = time.time()
     n = len(documents)
     candidates_set = init_candidates_set(n, k, 0, len(metrics))
     print(candidates_set)
-    mock_tables = mocked_tables != None
+    mock_tables = mocked_tables is not None
     relevance_table = Metric(metrics[0], 1 ,n)
     diversity_table = Metric(metrics[1], n ,n)
     if mock_tables:
@@ -166,22 +179,23 @@ def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables 
         diversity_table.call_all(documents)
     
     print("*****************************")
-    print(relevance_table)
-    print(diversity_table)
-    print("*****************************")
+    #print(relevance_table)
+    #print(diversity_table)
+    #print("*****************************")
 
     result = compute_exact_scores_baseline([relevance_table, diversity_table], candidates_set)
     print("Baseline Approach - Exact scores:\n", result)
     print("*****************************")
 
-    return result
+    duration = time.time() - start_time
+    return TopKResult(EXACT_BASELINE, result, duration, choose_2(n))
 
 def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None):
     # init candidate set and tables
+    start_time = time.time()
     n = len(documents)
     candidates_set = init_candidates_set(n, k, 0, len(metrics))
-    print(candidates_set)
-    mock_tables = mocked_tables != None
+    mock_tables = mocked_tables is not None
     relevance_table = Metric(metrics[0], 1 ,n)
     diversity_table = Metric(metrics[1], n ,n)
     if mock_tables:
@@ -191,11 +205,6 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None):
         relevance_table.call_all(documents, input_query)
         diversity_table.call_all(documents)
     
-    print("*****************************")
-    print(relevance_table)
-    print(diversity_table)
-    print("*****************************")
-
     for d in range(relevance_table.m):
         # update bounds
         value = relevance_table.table[0][d]
@@ -214,7 +223,9 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None):
             # prune
             candidates_set = prune(candidates_set, updated_keys)
     
-    return candidates_set
+    print("The best candidate - Naive approach: \n", candidates_set)
+    duration = time.time() - start_time
+    return TopKResult(NAIVE, candidates_set, duration, choose_2(n))
 
 def choose_next_llm_diversity(diversity_table, candidates_set):
     pair_uncertainty_scores = {}
@@ -275,12 +286,14 @@ def prune(candidates_set, updated_keys):
         for key in candidates_set:
             if key != updated_key:
                 pruned_key = check_prune((updated_key, candidates_set[updated_key]), (key, candidates_set[key]))
-                if pruned_key != None: pruned_keys.add(pruned_key)
+                if pruned_key is not None: pruned_keys.add(pruned_key)
         for key in pruned_keys:
             candidates_set.pop(key)
     return candidates_set
 
 def find_top_k(input_query, documents, k, metrics, methods, mock_llms = False):
+    results = []
+
     # fill tables by mocking OR calling LLM for each cell
     if mock_llms:
         relevance_table = Metric(metrics[0], 1 ,n)
@@ -288,25 +301,56 @@ def find_top_k(input_query, documents, k, metrics, methods, mock_llms = False):
         relevance_table.set_all_random()
         diversity_table.set_all_random()
         mocked_tables = [relevance_table.table, diversity_table.table] if mock_llms else None 
+        print(relevance_table)
+        print(diversity_table)
     
-    if "Exact_Baseline" in methods:
-        find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables=mocked_tables)
+    if EXACT_BASELINE in methods:
+        results.append(find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables=mocked_tables))
 
-    if "Naive" in methods:
-        find_top_k_Naive(input_query, documents, k, metrics, mocked_tables=mocked_tables)
+    if NAIVE in methods:
+        results.append(find_top_k_Naive(input_query, documents, k, metrics, mocked_tables=mocked_tables))
 
-    if "Min_Uncertainty" in methods:
-        find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables=mocked_tables)
+    if MIN_UNCERTAINTY in methods:
+        results.append(find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables=mocked_tables))
+    
+    return results
 
-# set inputs
+def store_results(results):
+    filename = "results.txt"
+
+    with open(filename, 'w') as file:
+        file.write("Experiment Results\n")
+        file.write("==================\n\n")
+
+        for i, result in enumerate(results, 1):
+            file.write(f"Algorithm {i}: {result.algorithm}\n")
+            file.write("-" * (12 + len(result.algorithm)) + "\n")
+            file.write(f"Candidates Set: {result.candidates_set}\n")
+            file.write(f"Execution Time: {result.time:.4f} seconds\n")
+            file.write(f"API Calls: {result.api_calls}\n")
+            file.write("\n")
+
+        # file.write("Summary\n")
+        # file.write("-------\n")
+        # file.write(f"Total Algorithms: {len(results)}\n")
+        # file.write(f"Total Execution Time: {sum(r.time for r in results):.4f} seconds\n")
+        # file.write(f"Total API Calls: {sum(r.api_calls for r in results)}\n")
+
+    print(f"Results have been stored in {filename}")
+
+# inputs
+MIN_UNCERTAINTY, EXACT_BASELINE, NAIVE = "Min_Uncertainty", "Exact_Baseline", "Naive"
 input_query = ""
-n = 3
-k = 2
+n = 5
+k = 3
 metrics = ["relevance", "diversity"]
-methods = ["Exact_Baseline", "Naive", "Min_Uncertainty"]
+methods = [MIN_UNCERTAINTY, EXACT_BASELINE, NAIVE]
+#methods = ["Exact_Baseline", "Naive"]
 mock_llms = True
 
+# run
 documents = read_documents(n=n)
-result = find_top_k(input_query, documents, k, metrics, methods, mock_llms)
-print(result)
+results = find_top_k(input_query, documents, k, metrics, methods, mock_llms)
 
+# store results
+store_results(results)
