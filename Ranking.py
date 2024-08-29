@@ -1,7 +1,7 @@
 import numpy as np
 import itertools
 import time
-import datetime
+from LLMApi import LLMApi
 
 class TopKResult:
     def __init__(self, algorithm, candidates_set, time, api_calls) -> None:
@@ -117,21 +117,25 @@ def call_all_llms_relevance(input_query, relevance_table, candidates_set, k, moc
         candidates_set, updated_candidates = update_lb_ub_relevance(candidates_set, d, value, k)
     return candidates_set, updated_candidates
 
-# NOTE
 def call_llm_relevance(query, d, relevance_table = None):
     # Case: Mocked LLM - d is integer
     if relevance_table is not None:
         return relevance_table[0][d]
     
     # Case: Real LLM - d is the string document
+    api = LLMApi()
+    result = api.call_llm_relevance(query, d)
+    return result
 
-# NOTE
 def call_llm_diversity(d1, d2, diversity_table = None):
     # Case: Mocked LLM - d is integer
     if diversity_table is not None:
         return diversity_table[d1][d2]
     
     # Case: Real LLM - d is the string document
+    api = LLMApi()
+    result = api.call_llm_diversity(d1, d2)
+    return result
 
 def find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables = None):
     # init candidates set and tables
@@ -340,10 +344,11 @@ def store_results(results):
 
 # inputs
 MIN_UNCERTAINTY, EXACT_BASELINE, NAIVE = "Min_Uncertainty", "Exact_Baseline", "Naive"
+RELEVANCE, DIVERSITY = "relevance", "diversity"
 input_query = ""
-n = 5
+n = 7
 k = 3
-metrics = ["relevance", "diversity"]
+metrics = [RELEVANCE, DIVERSITY]
 methods = [MIN_UNCERTAINTY, EXACT_BASELINE, NAIVE]
 #methods = ["Exact_Baseline", "Naive"]
 mock_llms = True
