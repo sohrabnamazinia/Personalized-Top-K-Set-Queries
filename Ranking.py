@@ -38,19 +38,16 @@ class Metric:
     def call_all(self, documents, query=None):
         # relevance table
         if query != None:
-            for i in range(self.m):
-                d = documents[i]
-                value = call_llm_relevance(query, d)
-                self.set(0, i, value)
+            for d in range(self.m):
+                value = call_llm_relevance(query, d, documents)
+                self.set(0, d, value)
 
         # diversity table
         else:
-            for i in range(self.n):
-                d1 = documents[i]
-                for j in range(self.m):
-                    d2 = documents[j]
-                    value = call_llm_diversity(d1, d2)
-                    self.set(i, j, value)
+            for d1 in range(self.n):
+                for d2 in range(self.m):
+                    value = call_llm_diversity(d1, d2, documents)
+                    self.set(d1, d2, value)
 
     def __str__(self):
         return f"Table(name={self.name}, shape=({self.n}, {self.m}))\n{self.table}"
@@ -112,12 +109,12 @@ def call_all_llms_relevance(input_query, documents, relevance_table, candidates_
 
     for d in range(n):
         # check if llm should be mocked or not and get value based on this condition
-        value = call_llm_relevance(input_query, documents, d, mocked_table) if mock_table else call_llm_relevance(input_query, documents, d)
+        value = call_llm_relevance(input_query, d, documents, mocked_table) if mock_table else call_llm_relevance(input_query, d, documents)
         relevance_table.set(0, d, value)
         candidates_set, updated_candidates = update_lb_ub_relevance(candidates_set, d, value, k)
     return candidates_set, updated_candidates
 
-def call_llm_relevance(query, documents, d, relevance_table = None):
+def call_llm_relevance(query, d, documents, relevance_table = None):
     # Case: Mocked LLM - d is integer
     if relevance_table is not None:
         return relevance_table[0][d]
@@ -351,8 +348,8 @@ input_path = "documents.txt"
 n = 5
 k = 3
 metrics = [RELEVANCE, DIVERSITY]
-#methods = [MIN_UNCERTAINTY, EXACT_BASELINE, NAIVE]
-methods = [MIN_UNCERTAINTY]
+methods = [MIN_UNCERTAINTY, EXACT_BASELINE, NAIVE]
+#methods = [MIN_UNCERTAINTY]
 #methods = ["Exact_Baseline", "Naive"]
 mock_llms = False
 
