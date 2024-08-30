@@ -17,17 +17,21 @@ class LLMApi:
         self.prompt_relevance = ChatPromptTemplate.from_template(LLMApi.prompt_relevance)
         self.prompt_diversity = ChatPromptTemplate.from_template(LLMApi.prompt_diversity)
         
-    @tool
+    
     def call_llm_relevance(self, query, d):
         """Estimate the relevance of the input to the query as a float number in the scale of 0.0 to 1.0"""
         chain = self.prompt_relevance | self.model 
         result = chain.invoke({"query": query, "d": d})
-        return result
+        return result.rate
     
-    @tool
+    
     def call_llm_diversity(self, d1, d2):
         """Estimate how diverse the two inputs are as a float number in the scale of 0.0 to 1.0"""
         chain = self.prompt_diversity | self.model 
         result = chain.invoke({"d1": d1, "d2": d2})
-        return result
+        return result.rate
+
+# api = LLMApi()
+# result = api.call_llm_relevance("I need a camera which can zoom very much", "this camera was good, it could magnify very well")
+# print(result.rate)
         

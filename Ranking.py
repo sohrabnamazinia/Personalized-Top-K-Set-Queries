@@ -41,7 +41,7 @@ class Metric:
             for i in range(self.m):
                 d = documents[i]
                 value = call_llm_relevance(query, d)
-                self.set(1, i, value)
+                self.set(0, i, value)
 
         # diversity table
         else:
@@ -55,11 +55,11 @@ class Metric:
     def __str__(self):
         return f"Table(name={self.name}, shape=({self.n}, {self.m}))\n{self.table}"
 
-# NOTE
-def read_documents(path=None, n=4):
-    result = []
-    for i in range(n):
-        result.append("")
+def read_documents(input_file=None, n=4, mock_llms=False):
+    if mock_llms:
+        return [""] * n
+    with open(input_file, 'r') as file:
+        result = file.read().splitlines()
     return result
 
 def init_candidates_set(n, k, lb_init_value, ub_init_value):
@@ -105,36 +105,36 @@ def check_prune(tuple_1, tuple_2):
     if bounds_2[0] >= bounds_1[1]: return candidate_1
     return None  
 
-def call_all_llms_relevance(input_query, relevance_table, candidates_set, k, mocked_table = False):
+def call_all_llms_relevance(input_query, documents, relevance_table, candidates_set, k, mocked_table = None):
     # relevance 
     n = relevance_table.m
     mock_table = mocked_table is not None
 
     for d in range(n):
         # check if llm should be mocked or not and get value based on this condition
-        value = call_llm_relevance(input_query, d, mocked_table) if mock_table else call_llm_relevance(input_query, d)
+        value = call_llm_relevance(input_query, documents, d, mocked_table) if mock_table else call_llm_relevance(input_query, documents, d)
         relevance_table.set(0, d, value)
         candidates_set, updated_candidates = update_lb_ub_relevance(candidates_set, d, value, k)
     return candidates_set, updated_candidates
 
-def call_llm_relevance(query, d, relevance_table = None):
+def call_llm_relevance(query, documents, d, relevance_table = None):
     # Case: Mocked LLM - d is integer
     if relevance_table is not None:
         return relevance_table[0][d]
     
     # Case: Real LLM - d is the string document
     api = LLMApi()
-    result = api.call_llm_relevance(query, d)
+    result = api.call_llm_relevance(query, documents[d])
     return result
 
-def call_llm_diversity(d1, d2, diversity_table = None):
+def call_llm_diversity(d1, d2, documents, diversity_table = None):
     # Case: Mocked LLM - d is integer
     if diversity_table is not None:
         return diversity_table[d1][d2]
     
     # Case: Real LLM - d is the string document
     api = LLMApi()
-    result = api.call_llm_diversity(d1, d2)
+    result = api.call_llm_diversity(documents[d1], documents[d2])
     return result
 
 def find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables = None):
@@ -146,7 +146,7 @@ def find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables
     diversity_table = Metric(metrics[1], n ,n)
 
     # use all relevance llm calls
-    candidates_set, _ = call_all_llms_relevance(input_query, relevance_table, candidates_set, k, mocked_tables[0])
+    candidates_set, _ = call_all_llms_relevance(input_query, documents, relevance_table, candidates_set, k, mocked_tables[0] if mocked_tables is not None else None)
     
     # algorithm
     count = 0
@@ -154,7 +154,7 @@ def find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables
         pair = choose_next_llm_diversity(diversity_table, candidates_set)
         if pair is not None: i, j = pair
         else: break 
-        value = call_llm_diversity(i, j, mocked_tables[1])
+        value = call_llm_diversity(i, j, documents, mocked_tables[1] if mocked_tables is not None else None)
         count += 1
         diversity_table.set(i, j, value)
         candidates_set, updated_candidates = update_lb_ub_diversity(candidates_set, (i, j), value, k)
@@ -297,6 +297,7 @@ def prune(candidates_set, updated_keys):
 
 def find_top_k(input_query, documents, k, metrics, methods, mock_llms = False):
     results = []
+    mocked_tables = None
 
     # fill tables by mocking OR calling LLM for each cell
     if mock_llms:
@@ -345,16 +346,18 @@ def store_results(results):
 # inputs
 MIN_UNCERTAINTY, EXACT_BASELINE, NAIVE = "Min_Uncertainty", "Exact_Baseline", "Naive"
 RELEVANCE, DIVERSITY = "relevance", "diversity"
-input_query = ""
-n = 7
+input_query = "I need a phone which is iPhone and has great storage"
+input_path = "documents.txt"
+n = 5
 k = 3
 metrics = [RELEVANCE, DIVERSITY]
-methods = [MIN_UNCERTAINTY, EXACT_BASELINE, NAIVE]
+#methods = [MIN_UNCERTAINTY, EXACT_BASELINE, NAIVE]
+methods = [MIN_UNCERTAINTY]
 #methods = ["Exact_Baseline", "Naive"]
-mock_llms = True
+mock_llms = False
 
 # run
-documents = read_documents(n=n)
+documents = read_documents(input_path, n, mock_llms)
 results = find_top_k(input_query, documents, k, metrics, methods, mock_llms)
 
 # store results
