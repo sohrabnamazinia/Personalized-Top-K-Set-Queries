@@ -33,5 +33,5 @@ class LLMApi:
 
 # api = LLMApi()
 # result = api.call_llm_relevance("I need a camera which can zoom very much", "this camera was good, it could magnify very well")
-# print(result.rate)
+# print(result)
         
