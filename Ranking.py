@@ -486,7 +486,7 @@ def find_top_k(input_query, documents, k, metrics, methods, mock_llms = False):
     return results
 
 def store_results(results):
-    filename = "C:\\Users\\ghosh\\Downloads\\LangChain-main\\LangChain-main\\results.txt"
+    filename = "results.txt"
     with open(filename, 'w') as file:
         file.write("Experiment Results\n")
         file.write("==================\n\n")
@@ -512,8 +512,8 @@ def store_results(results):
 LOWEST_OVERLAP, MIN_UNCERTAINTY, EXACT_BASELINE, NAIVE = "Lowest_Overlap", "Min_Uncertainty", "Exact_Baseline", "Naive"
 RELEVANCE, DIVERSITY = "relevance", "diversity"
 input_query = "I need a phone which is iPhone and has great storage"
-input_path = "LangChain-main\documents.txt"
-n = 5
+input_path = "documents.txt"
+n = 8
 k = 3
 metrics = [RELEVANCE, DIVERSITY]
 methods = [MIN_UNCERTAINTY, LOWEST_OVERLAP, EXACT_BASELINE, NAIVE]
