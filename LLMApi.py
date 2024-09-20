@@ -13,7 +13,8 @@ class LLMApi:
     prompt_diversity = "The following two comments are about an item. Estimate the diversity of these two comments as a floating point number in a scale of 0.0 to 1.0:\nComment 1: {d1}\nComment 2: {d2}"
     # NOTE: set this false if not needed
     def __init__(self, is_output_discrete=True) -> None:
-        self.model_name = "gpt-4-turbo"
+        self.model_name = "gpt-3.5-turbo"
+        #self.model_name = "gpt-4-turbo"
         self.model = ChatOpenAI(model=self.model_name).with_structured_output(Rating)
         self.prompt_relevance = ChatPromptTemplate.from_template(LLMApi.prompt_relevance)
         self.prompt_diversity = ChatPromptTemplate.from_template(LLMApi.prompt_diversity)

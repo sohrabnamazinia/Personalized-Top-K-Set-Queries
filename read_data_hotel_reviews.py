@@ -16,5 +16,14 @@ def read_data_fake():
     result = {"XXX" : reviews}
     return result
 
+def merge_reviews(hotel_reviews):
+    merged_reviews = []
+    
+    for _, reviews in hotel_reviews.items():
+        merged_reviews.extend(reviews)
+    
+    return list(merged_reviews)
+
+
 # r = read_data()
 # print(r.keys())

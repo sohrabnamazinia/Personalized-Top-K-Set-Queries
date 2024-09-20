@@ -1,5 +1,8 @@
 import itertools
 
+LOWEST_OVERLAP, MIN_UNCERTAINTY, EXACT_BASELINE, NAIVE = "Lowest_Overlap", "Min_Uncertainty", "Exact_Baseline", "Naive"
+RELEVANCE, DIVERSITY = "relevance", "diversity"
+
 class TopKResult:
     def __init__(self, algorithm, candidates_set, time, api_calls, entropy, entropydep) -> None:
         self.algorithm = algorithm
@@ -58,3 +61,4 @@ def check_prune(tuple_1, tuple_2):
     if bounds_1[0] >= bounds_2[1]: return candidate_2
     if bounds_2[0] >= bounds_1[1]: return candidate_1
     return None  
+
