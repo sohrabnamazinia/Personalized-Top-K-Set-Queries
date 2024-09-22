@@ -538,13 +538,13 @@ def store_results(results):
 # inputs
 input_query = "I need a phone which is iPhone and has great storage"
 input_path = "documents.txt"
-n = 8
-k = 3
+n = 3
+k = 2
 metrics = [RELEVANCE, DIVERSITY]
 methods = [MIN_UNCERTAINTY, LOWEST_OVERLAP, EXACT_BASELINE, NAIVE]
 #methods = [MIN_UNCERTAINTY]
 #methods = ["Exact_Baseline", "Naive"]
-mock_llms = True
+mock_llms = False
 
 
 # run
