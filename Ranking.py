@@ -535,21 +535,21 @@ def store_results(results):
 
     print(f"Results have been stored in {filename}")
 
-# inputs
-input_query = "I need a phone which is iPhone and has great storage"
-input_path = "documents.txt"
-n = 3
-k = 2
-metrics = [RELEVANCE, DIVERSITY]
-methods = [MIN_UNCERTAINTY, LOWEST_OVERLAP, EXACT_BASELINE, NAIVE]
-#methods = [MIN_UNCERTAINTY]
-#methods = ["Exact_Baseline", "Naive"]
-mock_llms = False
+# # inputs
+# input_query = "I need a phone which is iPhone and has great storage"
+# input_path = "documents.txt"
+# n = 3
+# k = 2
+# metrics = [RELEVANCE, DIVERSITY]
+# methods = [MIN_UNCERTAINTY, LOWEST_OVERLAP, EXACT_BASELINE, NAIVE]
+# #methods = [MIN_UNCERTAINTY]
+# #methods = ["Exact_Baseline", "Naive"]
+# mock_llms = False
 
 
-# run
-documents = read_documents(input_path, n, mock_llms)
-results = find_top_k(input_query, documents, k, metrics, methods, mock_llms)
+# # run
+# documents = read_documents(input_path, n, mock_llms)
+# results = find_top_k(input_query, documents, k, metrics, methods, mock_llms)
 
-# store results
-store_results(results)
+# # store results
+# store_results(results)
