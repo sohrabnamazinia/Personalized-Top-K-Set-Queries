@@ -8,3 +8,4 @@ dataset_hotel_reviews/
 
 # ignore environ files
 .env
+testing.py
