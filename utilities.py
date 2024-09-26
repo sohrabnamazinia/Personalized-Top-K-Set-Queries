@@ -4,13 +4,14 @@ LOWEST_OVERLAP, MIN_UNCERTAINTY, EXACT_BASELINE, NAIVE = "Lowest_Overlap", "Min_
 RELEVANCE, DIVERSITY = "relevance", "diversity"
 
 class TopKResult:
-    def __init__(self, algorithm, candidates_set, time, api_calls, entropy, entropydep) -> None:
+    def __init__(self, algorithm, candidates_set, time, api_calls, discentropydep) -> None:
         self.algorithm = algorithm
         self.candidates_set = candidates_set
         self.time = time
         self.api_calls = api_calls
-        self.entropy = entropy
-        self.entropydep = entropydep
+        # self.entropy = entropy
+        # self.entropydep = entropydep
+        self.discentropydep = discentropydep
 
 def read_documents(input_file=None, n=4, mock_llms=False):
     if mock_llms:
