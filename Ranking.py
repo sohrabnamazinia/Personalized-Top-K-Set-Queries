@@ -235,41 +235,128 @@ def sanity_check(x):
     # print(candidates_set, entropy)
     return round(entropy, 4)
 
-def prob_cand_winner(flat_table):
-    cand_win_counter = list(flat_table.values()).count(1)
-    prob_cand_winning = cand_win_counter/len(flat_table)
-    return prob_cand_winning
+def prob_cand_winner(n_dim_table):
+    cand_win_val = np.max(n_dim_table)
+    if cand_win_val > 0:
+        # cand_win_counter = list(flat_table.values()).count(cand_win_val) # count all the 2s present if more than 2 cands are involved, otherwise for first comparison count the number of 1s
+        cand_win_counter = (n_dim_table == cand_win_val).sum()
+        condition_val = cand_win_val - 1
+        denominator = (n_dim_table == condition_val).sum() + cand_win_counter  # count all the 2s and 1s if more than 2 cands are involved, otherwise 1s and 0s
+        prob_cand_winning = cand_win_counter/denominator  # this is the conditional probability being calculated p(c1>cn | c1>c2, c1>c3, ..., c1>cn-1)
+        return prob_cand_winning
+    return 0
 
-def generate_table(bound, other_bound, possible_indices = None):
+def mapper(any_range: tuple):
+    '''takes the range of values in float [lb,ub] and maps them to integer indices to traverse the np.array'''
+    dt = {i:any_range[i] for i in range(len(any_range))}
+    return dt
+
+def generate_table(bound, other_bound, stored_bounds, flag = False):
     '''Directly generates a flattened n-dim table whose cells are the intersection region of candidates filling up cells with 1 wherever a particular candidate is greater than all other candidates'''
     lb, ub = bound
     olb, oub = other_bound
     lb, ub, olb, oub = int(lb*10), int(ub*10), int(olb*10), int(oub*10)
-    flat_table = {}
-    if possible_indices == None:
-        possible_indices = list(itertools.product(tuple([round(i*0.1, 1) for i in range(lb, ub+1, 1)]), tuple([round(i*0.1, 1) for i in range(olb, oub+1, 1)])))  # Generate all possible tuples of values the candidates can take within their respective bounds --> flattening the table dimensions
+    if flag == False:
+        # flat_table = {}
+        shape = (ub-lb+1, oub-olb+1)
+        n_dim_table = np.zeros(shape)
+        # possible_indices = list(itertools.product(tuple([round(i*0.1, 1) for i in range(lb, ub+1, 1)]), tuple([round(i*0.1, 1) for i in range(olb, oub+1, 1)])))  # Generate all possible tuples of values the candidates can take within their respective bounds --> flattening the table dimensions
+        c_range = tuple([round(i*0.1, 1) for i in range(lb, ub+1)])
+        o_range = tuple([round(i*0.1, 1) for i in range(olb, oub+1)])
+        index1 = mapper(c_range)
+        index2 = mapper(o_range)
+        possible_indices = list(itertools.product(tuple(index1.keys()), tuple(index2.keys())))
         for indices in possible_indices:
-            candidate_key = indices[0]
+            candidate_key = index1[indices[0]]
             for j in indices[1:]:
-                if candidate_key < j: # If candidate is less than any other candidate for the given tuple of values in indices, then mark the corresponding cell as 0 representing candidate is not the winner for those values
-                    flat_table[indices] = 0
+                if candidate_key < index2[j]: # If candidate is less than any other candidate for the given tuple of values in indices, then mark the corresponding cell as 0 representing candidate is not the winner for those values
+                    # flat_table[indices] = 0
+                    n_dim_table[indices] = 0
                     break
-                flat_table[indices] = 1  # Candidate is greater than all other candidates for this set of values e.g. C1 > C2, C1 > C3, C1> C4 for (0.9, 0.5, 0.2, 0.4) values of C1, C2, C3, C4 respectively
-        return flat_table, possible_indices
+                n_dim_table[indices] = 1
+                # flat_table[indices] = 1  # Candidate is greater than all other candidates for this set of values e.g. C1 > C2, C1 > C3, C1> C4 for (0.9, 0.5, 0.2, 0.4) values of C1, C2, C3, C4 respectively
+        prob_score_cand = prob_cand_winner(n_dim_table)
+        return prob_score_cand, True
     else:
+        # flat_table = {}
         other_bound_range = tuple([round(i*0.1, 1) for i in range(olb, oub+1, 1)])
-        new_possible_indices = list(itertools.product(possible_indices, other_bound_range))
-        new_possible_indices = [item1 + (item2,) for item1, item2 in new_possible_indices]
+        # ln = [tuple([round(i*0.1, 1) for i in range(lb, ub+1, 1)])]  # create a list of possible values the candidate can take
+        # append the list with the values of the previous candidates
+        shape = (ub-lb+1,)
+        ln = [mapper(tuple([round(i*0.1, 1) for i in range(lb, ub+1, 1)]))]
+        for bnd in stored_bounds[:-1]: # last element not considered since it is the original bound of the now considered other bound
+            x,y = bnd
+            x,y = int(x*10), int(y*10)
+            shape = shape + (y-x+1,)
+            ln.append(mapper(tuple([round(i*0.1, 1) for i in range(x, y+1, 1)])))
+        ln.append(mapper(other_bound_range))  # append the shrinked other candidate's values to the last
+        # print(ln)
+        shape = shape + (oub - olb+1,)
+        n_dim_table = np.zeros(shape)
+        # new_possible_indices = list(itertools.product(possible_indices, other_bound_range))
+        # new_possible_indices = [item1 + (item2,) for item1, item2 in new_possible_indices]
+        nln = [tuple(dt.keys()) for dt in ln]
+        new_possible_indices = list(itertools.product(*nln)) # perform cartesian product between each tuple to get the indices for an n-dim table
+        # print(new_possible_indices)
         for indices in new_possible_indices:
-            candidate_key = indices[0]
-            for j in indices[1:]:
-                if candidate_key < j: # If candidate is less than any other candidate for the given tuple of values in indices, then mark the corresponding cell as 0 representing candidate is not the winner for those values
-                    flat_table[indices] = 0
+            ck = indices[0]
+            # print(type(ck), ln[0][0])
+            candidate_key = ln[0][ck]
+            for j in range(len(indices[1:-1])+1):
+                if candidate_key < ln[j][indices[j]]: # If candidate is less than any other candidate for the given tuple of values in indices, then mark the corresponding cell as 0 representing candidate is not the winner for those values
+                    n_dim_table[indices] = 0
                     break
-                flat_table[indices] = 1  # Candidate is greater than all other candidates for this set of values e.g. C1 > C2, C1 > C3, C1> C4 for (0.9, 0.5, 0.2, 0.4) values of C1, C2, C3, C4 respectively
-        return flat_table, possible_indices
+                n_dim_table[indices] = 1  # Candidate is greater than all other candidates except the current other candidate for this set of values e.g. C1 > C2, C1 > C3 for (0.9, 0.5, 0.2) values of C1, C2, C3 respectively but C1 !> C4 yet
+                if candidate_key >= ln[-1][indices[-1]]:
+                    n_dim_table[indices] = 2 # Candidate is greater than all other candidates for this set of values e.g. C1 > C2, C1 > C3, C1 > C4 for (0.9, 0.5, 0.2, 0.4) values of C1, C2, C3, C4 respectively
+        prob_score_cand = prob_cand_winner(n_dim_table)
+        return prob_score_cand, True
 
-def generate_dep_prob_dist(candidates_set, algorithm = None):
+def shared_region_exclude(c1, c1_bound, c2, c2_bound, div_tab: Metric, rel_tab: Metric=None):
+    '''Checks for common elements between 2 candidates and accordingly calculates conditional probability'''
+    common = []
+    k = len(c1)
+    denom_div = choose_2(k)  # denominator when the bound was calculated using diversity
+    c1lb, c1ub = c1_bound
+    c2lb, c2ub = c2_bound
+    # print(rel_tab)
+    rel_c1 = sum(map(lambda doc: rel_tab.peek_value(doc), c1))/k # relevance score for c1
+    rel_c2 = sum(map(lambda doc: rel_tab.peek_value(doc), c2))/k # relevance score for c2
+    for docs in c1:
+        if docs in c2: common.append(docs)
+    # print(k, c1, c2, common)
+    if len(common) > 1:
+        for i in range(len(common)):
+            for y in common[i+1:]:
+                x = common[i]
+                # print(denom_div)
+                if div_tab.peek_value(x,y) is None:
+                    val = 0
+                    print(x,y,val)
+                    # subtracting the rel score from lb and ub, then multiplying them with the denominator for 
+                    # normalized div score to get the sum of diversity scores, then subtracting the value, after which 
+                    # dividing the newly obtained sum of div scores without val with the denominator - 1 (Accounting for the val being
+                    # removed) and then finally adding the rel score again to obtain the new lb without the common element
+                    c1lb = (((c1lb - rel_c1)*denom_div - val)/(denom_div - 1)) + rel_c1
+                    c2lb = (((c2lb - rel_c2)*denom_div - val)/(denom_div - 1)) + rel_c2
+                    val = 1
+                    c1ub = (((c1ub - rel_c1)*denom_div - val)/(denom_div - 1)) + rel_c1
+                    c2ub = (((c2ub - rel_c2)*denom_div - val)/(denom_div - 1)) + rel_c2
+                else:
+                    val = div_tab.peek_value(x,y)
+                    print(x,y,val)
+                    c1lb = (((c1lb - rel_c1)*denom_div - val)/(denom_div - 1)) + rel_c1
+                    c2lb = (((c2lb - rel_c2)*denom_div - val)/(denom_div - 1)) + rel_c2
+                    c1ub = (((c1ub - rel_c1)*denom_div - val)/(denom_div - 1)) + rel_c1
+                    c2ub = (((c2ub - rel_c2)*denom_div - val)/(denom_div - 1)) + rel_c2
+                denom_div = denom_div -1
+    new_c1bnd = (c1lb, c1ub)
+    new_c2bnd = (c2lb, c2ub)
+    return new_c1bnd, new_c2bnd
+        # new_c1 = set(c1) - set(common)
+        # new_c2 = set(c2) - set(common)
+
+def generate_dep_prob_dist(candidates_set, diversity_table, relevance_table, algorithm = None):
     '''Generate a flattened out version of an n-dim table that stores the probability scores for a candidate being greater than the others'''
     if algorithm == NAIVE or algorithm == EXACT_BASELINE:
         return 0
@@ -278,15 +365,20 @@ def generate_dep_prob_dist(candidates_set, algorithm = None):
     probabilities_candidate = {}
     # mockset = deepcopy(candidates_set)
     for cand, bound in candidates_set.items():
-        possible_indices = None  # for each candidate possible indices start from None
+        flag = False # for each candidate new table is created
+        store_bounds = []
+        original_bound = deepcopy(bound)
         for other_cand, other_bound in candidates_set.items():
             if other_cand == cand: continue
-            flat_table, possible_indices = generate_table(bound, other_bound, possible_indices) if possible_indices else generate_table(bound, other_bound,)
-            prob_score_cand = prob_cand_winner(flat_table)
+            store_bounds.append(other_bound)
+            bound, other_bound = shared_region_exclude(cand, original_bound, other_cand, other_bound, diversity_table, relevance_table)
+            prob_score_cand, flag = generate_table(bound, other_bound, store_bounds, flag) if flag else generate_table(bound, other_bound, store_bounds) 
             if prob_score_cand == 0:
                 probabilities_candidate[cand] = 0
                 break # if a candidate ever gets 0 probability w.r.t. other candidates, it's probability score of being the winner becomes 0, so it does not need to be computed any further
-            probabilities_candidate[cand] = prob_score_cand # no need to multiply as we are directly computing p(c1>c2, c1>c3, ...., c1>cn); so just update the probability for the particular candidate as more and more other candidates are considered for it
+            prior_prob = probabilities_candidate.get(cand, 1)
+            probabilities_candidate[cand] = prior_prob*prob_score_cand # need to multiply as we are directly computing conditional probability
+        print(cand, probabilities_candidate[cand])
         if not sanity_check(probabilities_candidate[cand]): print(f"Error calculating prob for {cand} given set {candidates_set}")
 
     entropy = -sum(map(lambda p: 0 if p==0 else p * math.log2(p), probabilities_candidate.values()))
@@ -309,15 +401,14 @@ def find_top_k_lowest_overlap(input_query, documents, k, metrics, mocked_tables 
     # use all relevance llm calls
     # entropy = call_entropy(candidates_set)
     # entropy_dep = call_entropy_dependence(candidates_set, relevance_table, diversity_table)
-    discentropydep = generate_dep_prob_dist(candidates_set)
     candidates_set, _ = call_all_llms_relevance(input_query, documents, relevance_table, candidates_set, k, mocked_tables[0] if mocked_tables is not None else None)
-    
+    discentropydep = generate_dep_prob_dist(candidates_set, diversity_table, relevance_table)
     # algorithm
     count = 0
     while len(candidates_set) > 1:
         # entropy = call_entropy(candidates_set)
         # entropy_dep = call_entropy_dependence(candidates_set, relevance_table, diversity_table)
-        discentropydep = generate_dep_prob_dist(candidates_set)
+        discentropydep = generate_dep_prob_dist(candidates_set, diversity_table, relevance_table)
         # print(f"Entropy at iteration {count}: ",entropy)
         # print(f"Entropy (dep) at iteration {count}: ",entropy_dep)
         # entropy_over_time.append(entropy)
@@ -334,7 +425,7 @@ def find_top_k_lowest_overlap(input_query, documents, k, metrics, mocked_tables 
 
     # entropy_over_time.append(call_entropy(candidates_set))
     # entropy_dep_over_time.append(call_entropy_dependence(candidates_set, relevance_table, diversity_table))
-    discentropydep_over_time.append(generate_dep_prob_dist(candidates_set))
+    discentropydep_over_time.append(generate_dep_prob_dist(candidates_set, diversity_table, relevance_table))
     print("*************************************")
     print("Result - Lowest Overlap: \n", candidates_set)
     print("Total number of calls: " , count)
@@ -359,15 +450,14 @@ def find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables
     # use all relevance llm calls
     # entropy = call_entropy(candidates_set)
     # entropy_dep = call_entropy_dependence(candidates_set, relevance_table, diversity_table)
-    discentropydep = generate_dep_prob_dist(candidates_set)
     candidates_set, _ = call_all_llms_relevance(input_query, documents, relevance_table, candidates_set, k, mocked_tables[0] if mocked_tables is not None else None)
-    
+    discentropydep = generate_dep_prob_dist(candidates_set, diversity_table, relevance_table)
     # algorithm
     count = 0
     while len(candidates_set) > 1:
         # entropy = call_entropy(candidates_set)
         # entropy_dep = call_entropy_dependence(candidates_set, relevance_table, diversity_table)
-        discentropydep = generate_dep_prob_dist(candidates_set)
+        discentropydep = generate_dep_prob_dist(candidates_set, diversity_table, relevance_table)
         # print(f"Entropy at iteration {count}: ",entropy)
         # print(f"Entropy (dep) at iteration {count}: ",entropy_dep)
         # entropy_over_time.append(entropy)
@@ -384,7 +474,7 @@ def find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables
         
     # entropy_over_time.append(call_entropy(candidates_set))
     # entropy_dep_over_time.append(call_entropy_dependence(candidates_set, relevance_table, diversity_table))
-    discentropydep_over_time.append(generate_dep_prob_dist(candidates_set))
+    discentropydep_over_time.append(generate_dep_prob_dist(candidates_set, diversity_table, relevance_table))
     print("*************************************")
     print("Result - Min Uncertainty: \n", candidates_set)
     print("Total number of calls: " , count)
@@ -411,7 +501,7 @@ def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables 
     
     # entropy = call_entropy(candidates_set, algorithm)
     # entropy_dep = call_entropy_dependence(candidates_set, relevance_table, diversity_table, algorithm)
-    discentropydep = generate_dep_prob_dist(candidates_set, algorithm)
+    discentropydep = generate_dep_prob_dist(candidates_set, diversity_table, relevance_table, algorithm)
     print("*****************************")
     #print(relevance_table)
     #print(diversity_table)
@@ -435,7 +525,7 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None):
     n = len(documents)
     candidates_set = init_candidates_set(n, k, 0, len(metrics))
     # entropy_over_time.append(call_entropy(candidates_set))
-    discentropydep_over_time.append(generate_dep_prob_dist(candidates_set))
+    # discentropydep_over_time.append(generate_dep_prob_dist(candidates_set, diversity_table, relevance_table))
     mock_tables = mocked_tables is not None
     relevance_table = Metric(metrics[0], 1 ,n)
     diversity_table = Metric(metrics[1], n ,n)
@@ -454,7 +544,7 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None):
         candidates_set = prune(candidates_set, updated_keys)
         # entropy_over_time.append(call_entropy(candidates_set))
         # entropy_dep_over_time.append(call_entropy_dependence(candidates_set, relevance_table, diversity_table))
-        discentropydep_over_time.append(generate_dep_prob_dist(candidates_set))
+        # discentropydep_over_time.append(generate_dep_prob_dist(candidates_set, diversity_table, relevance_table))
         # print(entropy_over_time[-1])
 
     for i in range(diversity_table.n):
@@ -467,12 +557,12 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None):
             candidates_set = prune(candidates_set, updated_keys)
             # entropy_over_time.append(call_entropy(candidates_set))
             # entropy_dep_over_time.append(call_entropy_dependence(candidates_set, relevance_table, diversity_table))
-            discentropydep_over_time.append(generate_dep_prob_dist(candidates_set))
+            discentropydep_over_time.append(generate_dep_prob_dist(candidates_set, diversity_table, relevance_table))
             # print(entropy_over_time[-1])
     
     # entropy_over_time.append(call_entropy(candidates_set, algorithm))
     # entropy_dep_over_time.append(call_entropy_dependence(candidates_set, relevance_table, diversity_table, algorithm))
-    discentropydep_over_time.append(generate_dep_prob_dist(candidates_set, algorithm))
+    discentropydep_over_time.append(generate_dep_prob_dist(candidates_set, diversity_table, relevance_table, algorithm))
     print("The best candidate - Naive approach: \n", candidates_set)
     # print("Final entropy: ",entropy_over_time[-1])
     duration = time.time() - start_time
@@ -665,7 +755,7 @@ def store_results(results):
 # inputs
 input_query = "I need a phone which is iPhone and has great storage"
 input_path = "documents.txt"
-n = 8
+n = 5
 k = 3
 metrics = [RELEVANCE, DIVERSITY]
 methods = [MIN_UNCERTAINTY, LOWEST_OVERLAP, EXACT_BASELINE, NAIVE]
