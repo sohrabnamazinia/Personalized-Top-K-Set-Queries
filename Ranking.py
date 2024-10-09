@@ -5,6 +5,7 @@ from LLMApi import LLMApi
 from copy import deepcopy
 import math
 from utilities import RELEVANCE, DIVERSITY, NAIVE, MIN_UNCERTAINTY, LOWEST_OVERLAP, EXACT_BASELINE, TopKResult, read_documents, init_candidates_set, check_pair_exist, choose_2, compute_exact_scores_baseline, check_prune
+import gc
 
 class Metric:
     def __init__(self, name: str, n: int, m: int):
@@ -25,7 +26,8 @@ class Metric:
         else:
             raise IndexError("New Table has dimension conflict")
 
-    def set_all_random(self):
+    def set_all_random(self, seed):
+        np.random.seed(seed)
         self.table = np.round(np.random.random((self.n, self.m)), 1)
         if self.n > 1:
             mask = np.triu(np.ones((self.n, self.m)), k=1)
@@ -80,7 +82,7 @@ def call_llm_diversity(d1, d2, documents, diversity_table = None):
     result = api.call_llm_diversity(documents[d1], documents[d2])
     return result
 
-def prob_score(bound, other_bound):
+# def prob_score(bound, other_bound):
     c_lb, c_ub = bound
     o_lb, o_ub = other_bound
     # edge cases
@@ -104,7 +106,7 @@ def prob_score(bound, other_bound):
     if (c_lb == o_lb and c_ub < o_ub) or (c_ub == o_ub and c_lb < o_lb):
         return 0.5**2
 
-def call_entropy(candidates_set, algorithm= None):
+# def call_entropy(candidates_set, algorithm= None):
     if algorithm == NAIVE or algorithm == EXACT_BASELINE:
         return 0
     if len(candidates_set) == 1:
@@ -123,7 +125,7 @@ def call_entropy(candidates_set, algorithm= None):
     # print(candidates_set, entropy)
     return round(entropy, 4)
 
-def prob_score_dep(bound, other_bound):
+# def prob_score_dep(bound, other_bound):
     """A probability scoring function that checks if candidata > other candidate w.r.t their bounds. The bounds are update
     accordingly to indicate the range in which they are greater than the other candidate. It also calculates the complement
     probability and returns the bounds of the other candidate where it is greater than the candidate. It returns the 2 probabilities
@@ -166,7 +168,7 @@ def prob_score_dep(bound, other_bound):
         prob = 0.5**2
         return prob, (o_lb, c_ub)
     
-def call_entropy_dependence(candidates_set, algorithm= None):
+# def call_entropy_dependence(candidates_set, algorithm= None):
     if algorithm == NAIVE or algorithm == EXACT_BASELINE:
         return 0
     if len(candidates_set) == 1:
@@ -188,6 +190,106 @@ def call_entropy_dependence(candidates_set, algorithm= None):
     print(candidates_set, entropy)
     return round(entropy, 4)
 
+def gen_2d(grouped_pairs:list):
+    all_tables = {}
+    for pairs in grouped_pairs:
+        if len(pairs) == 2:
+            table_name = tuple([p[0] for p in pairs])
+            all_tables[table_name] = []
+            bounds = [p[1] for p in pairs]
+            c_lb, c_ub = bounds[0]
+            o_lb, o_ub = bounds[1]
+            c_lb, c_ub, o_lb, o_ub = int(c_lb*10), int(c_ub*10), int(o_lb*10), int(o_ub*10)
+            for c in range(c_lb, c_ub+1):
+                for o in range(o_lb, o_ub+1):
+                    if c > o:
+                        all_tables[table_name].append((c,o, 1))
+                    else:
+                        all_tables[table_name].append((c,o, 0))
+            # print("here", pairs,c_lb, c_ub, o_lb, o_ub, len(all_tables[table_name]))
+        elif len(pairs) == 1:
+            table_name = tuple([p[0] for p in pairs])
+            bounds = [p[1] for p in pairs]
+            all_tables[table_name] = []
+            c_lb, c_ub = bounds[0]
+            c_lb, c_ub = int(c_lb*10), int(c_ub*10)
+            for c in range(c_lb, c_ub+1):
+                all_tables[table_name].append((c,1))
+    return all_tables
+
+def scoring_func(cand, all_2d: dict):
+    req_table = None
+    req_table_vals = None
+    remember_comp = []
+    for table_names in all_2d.keys():
+        if cand in table_names:
+            req_table = table_names
+            req_table_vals = all_2d[table_names]
+            break
+    flag = 1
+    if cand == req_table[0]:
+        num = [vals[:-1] for vals in req_table_vals if 1 in vals]
+    else:
+        num = [vals[:-1] for vals in req_table_vals if 0 in vals]
+        flag = 2
+    # c_vals = [v[0] for v in num]
+    # remember_comp.extend(num)
+    # print("req",  req_table)
+    numer = len(num)
+    denom = len(req_table_vals)
+    prob = numer/denom
+    if prob == 0: return 0
+    mock_table = deepcopy(all_2d)
+    mock_table.pop(req_table)
+    for table_v in mock_table.values():
+        count = 0
+        temp = []
+        # print("num", num)
+        for n in num:
+            for vals in table_v:    
+                if flag == 1:
+                    if n[0] == max(n[0], max(vals[:-1])):
+                        count += 1
+                        # remember_comp.append((n, vals[:-1]))
+                        temp.append(n + vals[:-1])
+                elif flag == 2:
+                    if n[1] == max(n[1], max(vals[:-1])):
+                        count += 1
+                        # remember_comp.append((n, vals[:-1]))
+                        temp.append(n + vals[:-1])    
+        num = temp
+        del temp
+        gc.collect()
+        # print("tab", tables)
+        denom = denom * len(table_v)
+        numer = count
+        print(count, denom)
+        prob = count/denom
+        if prob == 0: return 0
+    return prob
+
+
+def call_entropy_discrete_2D(candidates_set:dict, algorithm=None):
+    if algorithm == NAIVE or algorithm == EXACT_BASELINE:
+        return 0
+    if len(candidates_set) == 1:
+        return 0  # When only 1 candidate is left, it is clearly the winner now so entropy becomes 0 automatically
+    probabilities_candidate = {}
+    print(candidates_set)
+    pairs = list(candidates_set.items())
+    grouped_pairs = [pairs[i:i+2] for i in range(0, len(pairs), 2)]
+    # print(grouped_pairs)
+    all_2d = gen_2d(grouped_pairs) 
+    # print(all_2d)
+    ckeys = list(candidates_set.keys())
+    for cand in ckeys:
+        prob_score = scoring_func(cand, all_2d)
+        probabilities_candidate[cand] = prob_score
+    entropy = -sum(map(lambda p: 0 if p==0 else p * math.log2(p), probabilities_candidate.values()))
+    print(probabilities_candidate)
+    # print(candidates_set, entropy)
+    return round(entropy, 4)
+
 def find_top_k_lowest_overlap(input_query, documents, k, metrics, mocked_tables = None):
     # init candidates set and tables
     algorithm = LOWEST_OVERLAP
@@ -197,7 +299,7 @@ def find_top_k_lowest_overlap(input_query, documents, k, metrics, mocked_tables 
     relevance_table = Metric(metrics[0], 1 ,n)
     diversity_table = Metric(metrics[1], n ,n)
     entropy_over_time = []
-    entropy_dep_over_time = []
+    entropy_discrete_2D = []
     # entropy_over_time.append(call_entropy(candidates_set))
     # entropy_dep_over_time.append(call_entropy_dependence(candidates_set))
     # use all relevance llm calls
@@ -206,12 +308,12 @@ def find_top_k_lowest_overlap(input_query, documents, k, metrics, mocked_tables 
     # algorithm
     count = 0
     while len(candidates_set) > 1:
-        entropy = call_entropy(candidates_set)
-        entropy_dep = call_entropy_dependence(candidates_set)
-        print(f"Entropy at iteration {count}: ",entropy)
+        # entropy = call_entropy(candidates_set)
+        entropy_dep = call_entropy_discrete_2D(candidates_set)
+        # print(f"Entropy at iteration {count}: ",entropy)
         print(f"Entropy (dep) at iteration {count}: ",entropy_dep)
-        entropy_over_time.append(entropy)
-        entropy_dep_over_time.append(entropy_dep)
+        # entropy_over_time.append(entropy)
+        entropy_discrete_2D.append(entropy_dep)
         pair = choose_next_llm_diversity_lowest_overlap(diversity_table, candidates_set)
         if pair is not None: i, j = pair
         else: break 
@@ -221,14 +323,14 @@ def find_top_k_lowest_overlap(input_query, documents, k, metrics, mocked_tables 
         candidates_set, updated_candidates = update_lb_ub_diversity(candidates_set, (i, j), value, k)
         candidates_set = prune(candidates_set, updated_candidates)
 
-    entropy_over_time.append(call_entropy(candidates_set))
-    entropy_dep_over_time.append(call_entropy_dependence(candidates_set))
+    # entropy_over_time.append(call_entropy(candidates_set))
+    entropy_discrete_2D.append(call_entropy_discrete_2D(candidates_set))
     print("*************************************")
     print("Result - Lowest Overlap: \n", candidates_set)
     print("Total number of calls: " , count)
-    print("Final entropy: ", entropy_over_time[-1])
+    # print("Final entropy: ", entropy_over_time[-1])
     duration = time.time() - start_time
-    return TopKResult(algorithm, candidates_set, duration, count, entropy_over_time, entropy_dep_over_time) 
+    return TopKResult(algorithm, candidates_set, duration, count, entropy_discrete_2D) 
 
 
 def find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables = None):
@@ -240,7 +342,7 @@ def find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables
     relevance_table = Metric(metrics[0], 1 ,n)
     diversity_table = Metric(metrics[1], n ,n)
     entropy_over_time = []
-    entropy_dep_over_time = []
+    entropy_discrete_2D = []
     # entropy_over_time.append(call_entropy(candidates_set))
     # entropy_dep_over_time.append(call_entropy_dependence(candidates_set))
     # use all relevance llm calls
@@ -249,12 +351,12 @@ def find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables
     # algorithm
     count = 0
     while len(candidates_set) > 1:
-        entropy = call_entropy(candidates_set)
-        entropy_dep = call_entropy_dependence(candidates_set)
-        print(f"Entropy at iteration {count}: ",entropy)
+        # entropy = call_entropy(candidates_set)
+        entropy_dep = call_entropy_discrete_2D(candidates_set)
+        # print(f"Entropy at iteration {count}: ",entropy)
         print(f"Entropy (dep) at iteration {count}: ",entropy_dep)
-        entropy_over_time.append(entropy)
-        entropy_dep_over_time.append(entropy_dep)
+        # entropy_over_time.append(entropy)
+        entropy_discrete_2D.append(entropy_dep)
         pair = choose_next_llm_diversity(diversity_table, candidates_set)
         if pair is not None: i, j = pair
         else: break 
@@ -264,14 +366,14 @@ def find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables
         candidates_set, updated_candidates = update_lb_ub_diversity(candidates_set, (i, j), value, k)
         candidates_set = prune(candidates_set, updated_candidates)
         
-    entropy_over_time.append(call_entropy(candidates_set))
-    entropy_dep_over_time.append(call_entropy_dependence(candidates_set))
+    # entropy_over_time.append(call_entropy(candidates_set))
+    entropy_discrete_2D.append(call_entropy_discrete_2D(candidates_set))
     print("*************************************")
     print("Result - Min Uncertainty: \n", candidates_set)
     print("Total number of calls: " , count)
-    print("Final entropy: ", entropy_over_time[-1])
+    # print("Final entropy: ", entropy_over_time[-1])
     duration = time.time() - start_time
-    return TopKResult(algorithm, candidates_set, duration, count, entropy_over_time, entropy_dep_over_time) 
+    return TopKResult(algorithm, candidates_set, duration, count, entropy_discrete_2D) 
 
 def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables = None):
     # init candidate set and tables
@@ -290,8 +392,8 @@ def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables 
         relevance_table.call_all(documents, input_query)
         diversity_table.call_all(documents)
     
-    entropy = call_entropy(candidates_set, algorithm)
-    entropy_dep = call_entropy_dependence(candidates_set, algorithm)
+    # entropy = call_entropy(candidates_set, algorithm)
+    entropy_dep = call_entropy_discrete_2D(candidates_set, algorithm)
     print("*****************************")
     #print(relevance_table)
     #print(diversity_table)
@@ -299,11 +401,11 @@ def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables 
 
     result = compute_exact_scores_baseline([relevance_table, diversity_table], candidates_set)
     print("Baseline Approach - Exact scores:\n", result)
-    print("Final entropy: ",entropy, entropy_dep)
+    # print("Final entropy: ",entropy, entropy_dep)
     print("*****************************")
 
     duration = time.time() - start_time
-    return TopKResult(algorithm, result, duration, choose_2(n), entropy, entropy_dep)
+    return TopKResult(algorithm, result, duration, choose_2(n), entropy_dep)
 
 def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None):
     # init candidate set and tables
@@ -313,8 +415,8 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None):
     start_time = time.time()
     n = len(documents)
     candidates_set = init_candidates_set(n, k, 0, len(metrics))
-    entropy_over_time.append(call_entropy(candidates_set))
-    entropy_dep_over_time.append(call_entropy_dependence(candidates_set))
+    # entropy_over_time.append(call_entropy(candidates_set))
+    # entropy_dep_over_time.append(call_entropy_discrete_2D(candidates_set))
     mock_tables = mocked_tables is not None
     relevance_table = Metric(metrics[0], 1 ,n)
     diversity_table = Metric(metrics[1], n ,n)
@@ -331,9 +433,9 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None):
         candidates_set, updated_keys = update_lb_ub_relevance(candidates_set, d, value, k)
         # prune
         candidates_set = prune(candidates_set, updated_keys)
-        entropy_over_time.append(call_entropy(candidates_set))
-        entropy_dep_over_time.append(call_entropy_dependence(candidates_set))
-        print(entropy_over_time[-1])
+        # entropy_over_time.append(call_entropy(candidates_set))
+        # entropy_dep_over_time.append(call_entropy_discrete_2D(candidates_set))
+        # print(entropy_over_time[-1])
 
     for i in range(diversity_table.n):
         for j in range(i + 1, diversity_table.m):
@@ -343,16 +445,16 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None):
             candidates_set, updated_keys = update_lb_ub_diversity(candidates_set, pair, value, k)
             # prune
             candidates_set = prune(candidates_set, updated_keys)
-            entropy_over_time.append(call_entropy(candidates_set))
-            entropy_dep_over_time.append(call_entropy_dependence(candidates_set))
-            print(entropy_over_time[-1])
+            # entropy_over_time.append(call_entropy(candidates_set))
+            entropy_dep_over_time.append(call_entropy_discrete_2D(candidates_set))
+            # print(entropy_over_time[-1])
     
-    entropy_over_time.append(call_entropy(candidates_set, algorithm))
-    entropy_dep_over_time.append(call_entropy_dependence(candidates_set, algorithm))
+    # entropy_over_time.append(call_entropy(candidates_set, algorithm))
+    entropy_dep_over_time.append(call_entropy_discrete_2D(candidates_set, algorithm))
     print("The best candidate - Naive approach: \n", candidates_set)
-    print("Final entropy: ",entropy_over_time[-1])
+    # print("Final entropy: ",entropy_over_time[-1])
     duration = time.time() - start_time
-    return TopKResult(algorithm, candidates_set, duration, choose_2(n), entropy_over_time, entropy_dep_over_time)
+    return TopKResult(algorithm, candidates_set, duration, choose_2(n), entropy_dep_over_time)
 
 def choose_next_llm_diversity(diversity_table, candidates_set):
     pair_uncertainty_scores = {}
@@ -483,7 +585,7 @@ def prune(candidates_set, updated_keys):
             candidates_set.pop(key)
     return candidates_set
 
-def find_top_k(input_query, documents, k, metrics, methods, mock_llms = False, is_output_discrete=True):
+def find_top_k(input_query, documents, k, metrics, methods, seed, mock_llms = False, is_output_discrete=True):
     results = []
     mocked_tables = None
     n = len(documents)
@@ -491,8 +593,9 @@ def find_top_k(input_query, documents, k, metrics, methods, mock_llms = False, i
     if mock_llms:
         relevance_table = Metric(metrics[0], 1 ,n)
         diversity_table = Metric(metrics[1], n ,n)
-        relevance_table.set_all_random()
-        diversity_table.set_all_random()
+        print(seed)
+        relevance_table.set_all_random(seed)
+        diversity_table.set_all_random(seed)
         mocked_tables = [relevance_table.table, diversity_table.table] if mock_llms else None 
         print(relevance_table)
         print(diversity_table)
@@ -523,7 +626,7 @@ def store_results(results):
             file.write(f"Candidates Set: {result.candidates_set}\n")
             file.write(f"Execution Time: {result.time:.4f} seconds\n")
             file.write(f"API Calls: {result.api_calls}\n")
-            file.write(f"Entropy over time: {result.entropy}\n")
+            # file.write(f"Entropy over time: {result.entropy}\n")
             file.write(f"Entropy (dep) over time: {result.entropydep}\n")
             file.write("\n")
 
@@ -536,20 +639,20 @@ def store_results(results):
     print(f"Results have been stored in {filename}")
 
 # # inputs
-# input_query = "I need a phone which is iPhone and has great storage"
-# input_path = "documents.txt"
-# n = 3
-# k = 2
-# metrics = [RELEVANCE, DIVERSITY]
-# methods = [MIN_UNCERTAINTY, LOWEST_OVERLAP, EXACT_BASELINE, NAIVE]
-# #methods = [MIN_UNCERTAINTY]
-# #methods = ["Exact_Baseline", "Naive"]
-# mock_llms = False
+input_query = "I need a phone which is iPhone and has great storage"
+input_path = "documents.txt"
+n = 5
+k = 3
+metrics = [RELEVANCE, DIVERSITY]
+methods = [MIN_UNCERTAINTY, LOWEST_OVERLAP, EXACT_BASELINE, NAIVE]
+#methods = [MIN_UNCERTAINTY]
+#methods = ["Exact_Baseline", "Naive"]
+mock_llms = True
+seed = 42
 
+# run
+documents = read_documents(input_path, n, mock_llms)
+results = find_top_k(input_query, documents, k, metrics, methods, seed, mock_llms)
 
-# # run
-# documents = read_documents(input_path, n, mock_llms)
-# results = find_top_k(input_query, documents, k, metrics, methods, mock_llms)
-
-# # store results
-# store_results(results)
+# store results
+store_results(results)
