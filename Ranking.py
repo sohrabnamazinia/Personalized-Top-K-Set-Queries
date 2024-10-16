@@ -265,44 +265,59 @@ def gen_2d(grouped_pairs:list):
         if prob == 0: return 0
     return prob
 
-def scoring_func2(cand, all_2d: dict):
-    for table_names in all_2d.keys():
-        if cand in table_names:
+def gen_1d(candidates_set:dict):
+    oned_table = {}
+    for cand, bound in candidates_set.items():
+        lb, ub = bound
+        lb, ub = int(lb*10), int(ub*10)
+        oned_table[cand] = [i for i in range(lb, ub+1)]
+    print(oned_table)
+    return oned_table
+
+def scoring_func2(cand, all_tables: dict):
+    for table_names in all_tables.keys():
+        # print(cand, table_names)
+        if cand == table_names:
             req_table = table_names
-            req_table_vals = all_2d[table_names]
+            req_table_vals = all_tables[table_names]
             break
-    flag = 1
-    if cand == req_table[0]:
-        num = [vals[:-1] for vals in req_table_vals if 1 in vals]
-    else:
-        num = [vals[:-1] for vals in req_table_vals if 0 in vals]
-        flag = 2
-    signals = {bin(i): num[i] for i in range(len(num))}
+    # flag = 1
+    # if cand == req_table[0]:
+    #     num = [vals[:-1] for vals in req_table_vals if 1 in vals]
+    # else:
+    #     num = [vals[:-1] for vals in req_table_vals if 0 in vals]
+    #     flag = 2
+    # signals = {bin(i): num[i] for i in range(len(num))}
+    signals = {bin(i): req_table_vals[i] for i in range(len(req_table_vals))}
     # print(signals)
     source_node = {vals:[keys] for keys, vals in signals.items()}
     denom = len(req_table_vals)
     numer = 1
-    for table_n, table_v in all_2d.items():
+    for table_n, table_v in all_tables.items():
         if table_n == req_table: continue
         inter_node = {}
         signal_counter = {}
+        print(source_node.keys())
         for sigs in source_node.values():  # Iterating through all the nodes and taking the list of signals in them
+            # print(len(sigs))
             for sig in sigs: # iterating through the signals at a particular node
                 for vals in table_v:  # checking if the signal is entering any of the nodes of the next table
-                    # print(signals[sig][1], vals)
-                    if flag == 1 and signals[sig][0] >= max(vals[:-1]): # if feasible signal, i.e., signal value is higher than the node value
+                    
+                    if signals[sig] >= vals: # if feasible signal, i.e., signal value is higher than the node value
                         # print(sig, signals[sig][0], vals[:-1])
+                        # print(signals[sig], vals)
                         signal_counter[sig] = signal_counter.get(sig, 0) + 1 # and the count for that signal increases for each node it enters
-                        if vals not in inter_node: inter_node[vals[:-1]] = [sig]  # then the signal enters that node
-                        else: inter_node[vals[:-1]].append(sig)
-                    if flag == 2 and signals[sig][1] >= max(vals[:-1]): # flag == 1 or 2 decides which col of the 2d table to consider as the candidate
-                        # print(sig, signals[sig][1], vals[:-1])
-                        signal_counter[sig] = signal_counter.get(sig, 0) + 1
-                        if vals not in inter_node: inter_node[vals[:-1]] = [sig]
-                        else: inter_node[vals[:-1]].append(sig)
+                        if vals not in inter_node: inter_node[vals] = [sig]  # then the signal enters that node
+                        else: 
+                            if sig not in inter_node[vals]: inter_node[vals].append(sig)
+                    # if flag == 2 and signals[sig][1] >= max(vals[:-1]): # flag == 1 or 2 decides which col of the 2d table to consider as the candidate
+                    #     # print(sig, signals[sig][1], vals[:-1])
+                    #     signal_counter[sig] = signal_counter.get(sig, 0) + 1
+                    #     if vals not in inter_node: inter_node[vals[:-1]] = [sig]
+                    #     else: inter_node[vals[:-1]].append(sig)
         source_node = inter_node  # the next node becomes the source node for the next table of nodes
         if len(source_node) == 0: return 0 # if at any point, no source node is there then end the iteration. Can happen for 0 probability of winning
-        # print(signal_counter)
+        print(signal_counter)
         numer = sum(signal_counter.values())
         denom = denom * len(table_v)
         print(cand, numer, denom)
@@ -315,14 +330,15 @@ def call_entropy_discrete_2D(candidates_set:dict, algorithm=None):
         return 0  # When only 1 candidate is left, it is clearly the winner now so entropy becomes 0 automatically
     probabilities_candidate = {}
     print(candidates_set)
-    pairs = list(candidates_set.items())
-    grouped_pairs = [pairs[i:i+2] for i in range(0, len(pairs), 2)]
-    # print(grouped_pairs)
-    all_2d = gen_2d(grouped_pairs) 
+    all_1d = gen_1d(candidates_set)
+    # pairs = list(candidates_set.items())
+    # grouped_pairs = [pairs[i:i+2] for i in range(0, len(pairs), 2)]
+    # # print(grouped_pairs)
+    # all_2d = gen_2d(grouped_pairs) 
     # print(all_2d)
     ckeys = list(candidates_set.keys())
     for cand in ckeys:
-        prob_score = scoring_func2(cand, all_2d)
+        prob_score = scoring_func2(cand, all_1d)
         probabilities_candidate[cand] = prob_score
     entropy = -sum(map(lambda p: 0 if p==0 else p * math.log2(p), probabilities_candidate.values()))
     print(probabilities_candidate)
