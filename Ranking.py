@@ -5,7 +5,6 @@ from LLMApi import LLMApi
 from copy import deepcopy
 import math
 from utilities import RELEVANCE, DIVERSITY, NAIVE, MIN_UNCERTAINTY, LOWEST_OVERLAP, EXACT_BASELINE, TopKResult, read_documents, init_candidates_set, check_pair_exist, choose_2, compute_exact_scores_baseline, check_prune
-import gc
 
 class Metric:
     def __init__(self, name: str, n: int, m: int):
@@ -202,11 +201,11 @@ def gen_2d(grouped_pairs:list):
             c_lb, c_ub, o_lb, o_ub = int(c_lb*10), int(c_ub*10), int(o_lb*10), int(o_ub*10)
             for c in range(c_lb, c_ub+1):
                 for o in range(o_lb, o_ub+1):
-                    if c > o:
+                    if c >= o:
                         all_tables[table_name].append((c,o, 1))
                     else:
                         all_tables[table_name].append((c,o, 0))
-            # print("here", pairs,c_lb, c_ub, o_lb, o_ub, len(all_tables[table_name]))
+            # print(all_tables[table_name])
         elif len(pairs) == 1:
             table_name = tuple([p[0] for p in pairs])
             bounds = [p[1] for p in pairs]
@@ -217,7 +216,7 @@ def gen_2d(grouped_pairs:list):
                 all_tables[table_name].append((c,1))
     return all_tables
 
-def scoring_func(cand, all_2d: dict):
+# def scoring_func(cand, all_2d: dict):
     req_table = None
     req_table_vals = None
     remember_comp = []
@@ -258,8 +257,6 @@ def scoring_func(cand, all_2d: dict):
                         # remember_comp.append((n, vals[:-1]))
                         temp.append(n + vals[:-1])    
         num = temp
-        del temp
-        gc.collect()
         # print("tab", tables)
         denom = denom * len(table_v)
         numer = count
@@ -268,6 +265,48 @@ def scoring_func(cand, all_2d: dict):
         if prob == 0: return 0
     return prob
 
+def scoring_func2(cand, all_2d: dict):
+    for table_names in all_2d.keys():
+        if cand in table_names:
+            req_table = table_names
+            req_table_vals = all_2d[table_names]
+            break
+    flag = 1
+    if cand == req_table[0]:
+        num = [vals[:-1] for vals in req_table_vals if 1 in vals]
+    else:
+        num = [vals[:-1] for vals in req_table_vals if 0 in vals]
+        flag = 2
+    signals = {bin(i): num[i] for i in range(len(num))}
+    # print(signals)
+    source_node = {vals:[keys] for keys, vals in signals.items()}
+    denom = len(req_table_vals)
+    numer = 1
+    for table_n, table_v in all_2d.items():
+        if table_n == req_table: continue
+        inter_node = {}
+        signal_counter = {}
+        for sigs in source_node.values():  # Iterating through all the nodes and taking the list of signals in them
+            for sig in sigs: # iterating through the signals at a particular node
+                for vals in table_v:  # checking if the signal is entering any of the nodes of the next table
+                    # print(signals[sig][1], vals)
+                    if flag == 1 and signals[sig][0] >= max(vals[:-1]): # if feasible signal, i.e., signal value is higher than the node value
+                        # print(sig, signals[sig][0], vals[:-1])
+                        signal_counter[sig] = signal_counter.get(sig, 0) + 1 # and the count for that signal increases for each node it enters
+                        if vals not in inter_node: inter_node[vals[:-1]] = [sig]  # then the signal enters that node
+                        else: inter_node[vals[:-1]].append(sig)
+                    if flag == 2 and signals[sig][1] >= max(vals[:-1]): # flag == 1 or 2 decides which col of the 2d table to consider as the candidate
+                        # print(sig, signals[sig][1], vals[:-1])
+                        signal_counter[sig] = signal_counter.get(sig, 0) + 1
+                        if vals not in inter_node: inter_node[vals[:-1]] = [sig]
+                        else: inter_node[vals[:-1]].append(sig)
+        source_node = inter_node  # the next node becomes the source node for the next table of nodes
+        if len(source_node) == 0: return 0 # if at any point, no source node is there then end the iteration. Can happen for 0 probability of winning
+        # print(signal_counter)
+        numer = sum(signal_counter.values())
+        denom = denom * len(table_v)
+        print(cand, numer, denom)
+    return numer/denom
 
 def call_entropy_discrete_2D(candidates_set:dict, algorithm=None):
     if algorithm == NAIVE or algorithm == EXACT_BASELINE:
@@ -283,7 +322,7 @@ def call_entropy_discrete_2D(candidates_set:dict, algorithm=None):
     # print(all_2d)
     ckeys = list(candidates_set.keys())
     for cand in ckeys:
-        prob_score = scoring_func(cand, all_2d)
+        prob_score = scoring_func2(cand, all_2d)
         probabilities_candidate[cand] = prob_score
     entropy = -sum(map(lambda p: 0 if p==0 else p * math.log2(p), probabilities_candidate.values()))
     print(probabilities_candidate)
