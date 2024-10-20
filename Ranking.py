@@ -305,7 +305,7 @@ def scoring_func2(cand, all_2d: dict):
         # print(signal_counter)
         numer = sum(signal_counter.values())
         denom = denom * len(table_v)
-        print(cand, numer, denom)
+        # print(cand, numer, denom)
     return numer/denom
 
 def call_entropy_discrete_2D(candidates_set:dict, algorithm=None):
@@ -324,6 +324,8 @@ def call_entropy_discrete_2D(candidates_set:dict, algorithm=None):
     for cand in ckeys:
         prob_score = scoring_func2(cand, all_2d)
         probabilities_candidate[cand] = prob_score
+    normaliser = sum(probabilities_candidate.values())
+    probabilities_candidate = {key:vals/normaliser for key,vals in probabilities_candidate.items()}
     entropy = -sum(map(lambda p: 0 if p==0 else p * math.log2(p), probabilities_candidate.values()))
     print(probabilities_candidate)
     # print(candidates_set, entropy)

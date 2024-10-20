@@ -15,7 +15,8 @@ my_dict = {
     'd': 4,
     'e': 5
 }
-
+new = my_dict / 5
+print(new)
 # Group dictionary into sets of 2 key-value pairs
 pairs = list(my_dict.items())  # Convert dictionary to a list of key-value tuples
 grouped_pairs = [pairs[i:i+2] for i in range(0, len(pairs), 2)]

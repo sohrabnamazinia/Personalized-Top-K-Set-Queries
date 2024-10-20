@@ -11,21 +11,21 @@ Entropy (dep) over time: 0
 Algorithm 2: Naive
 -----------------
 Candidates Set: {(0, 1, 2): (1.5666666666666667, 1.5666666666666664)}
-Execution Time: 0.5906 seconds
+Execution Time: 0.5854 seconds
 API Calls: 10
-Entropy (dep) over time: [0.0002, 0.0007, 0.002, 0.0722, 1.7724, 1.3088, 0.9288, 0, 0, 0, 0]
+Entropy (dep) over time: [3.2603, 3.2557, 3.2014, 2.6438, 1.7419, 1.3333, 1.0, 0, 0, 0, 0]
 
 Algorithm 3: Min_Uncertainty
 ---------------------------
 Candidates Set: {(0, 1, 2): (1.5666666666666667, 1.5666666666666664)}
-Execution Time: 0.9813 seconds
+Execution Time: 0.9439 seconds
 API Calls: 8
-Entropy (dep) over time: [0.0001, 0.0001, 0.0003, 0.0005, 0.0014, 0.0025, 1.9402, 0.9288, 0]
+Entropy (dep) over time: [3.2603, 3.2188, 3.2308, 3.1736, 3.1922, 3.0351, 1.8773, 1.0, 0]
 
 Algorithm 4: Lowest_Overlap
 --------------------------
 Candidates Set: {(0, 1, 2): (1.5666666666666667, 1.5666666666666664)}
-Execution Time: 0.9547 seconds
+Execution Time: 0.9191 seconds
 API Calls: 6
-Entropy (dep) over time: [0.0001, 0.0002, 0.0003, 0.0011, 1.3088, 0.75, 0]
+Entropy (dep) over time: [3.2603, 3.0613, 2.8747, 2.8747, 1.3333, 1.0, 0]
 
