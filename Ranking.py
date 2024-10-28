@@ -701,7 +701,7 @@ def prune(candidates_set, updated_keys):
             candidates_set.pop(key)
     return candidates_set
 
-def find_top_k(input_query, documents, k, metrics, methods, seed, mock_llms = False, is_output_discrete=True):
+def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms = False, is_output_discrete=True):
     results = []
     mocked_tables = None
     n = len(documents)
@@ -754,21 +754,21 @@ def store_results(results):
 
     print(f"Results have been stored in {filename}")
 
-# # inputs
-input_query = "I need a phone which is iPhone and has great storage"
-input_path = "documents.txt"
-n = 10
-k = 3
-metrics = [RELEVANCE, DIVERSITY]
-methods = [MIN_UNCERTAINTY, LOWEST_OVERLAP, EXACT_BASELINE, NAIVE]
-#methods = [MIN_UNCERTAINTY]
-#methods = ["Exact_Baseline", "Naive"]
-mock_llms = True
-seed = 42
+# # # inputs
+# input_query = "I need a phone which is iPhone and has great storage"
+# input_path = "documents.txt"
+# n = 10
+# k = 3
+# metrics = [RELEVANCE, DIVERSITY]
+# methods = [MIN_UNCERTAINTY, LOWEST_OVERLAP, EXACT_BASELINE, NAIVE]
+# #methods = [MIN_UNCERTAINTY]
+# #methods = ["Exact_Baseline", "Naive"]
+# mock_llms = True
+# seed = 42
 
-# run
-documents = read_documents(input_path, n, mock_llms)
-results = find_top_k(input_query, documents, k, metrics, methods, seed, mock_llms)
+# # run
+# documents = read_documents(input_path, n, mock_llms)
+# results = find_top_k(input_query, documents, k, metrics, methods, seed, mock_llms)
 
-# store results
-store_results(results)
+# # store results
+# store_results(results)

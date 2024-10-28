@@ -7,7 +7,7 @@ reviews_count = 6
 input_query = "A hotel with low price and nice view"
 k = 3
 metrics = [RELEVANCE, DIVERSITY]
-methods = [NAIVE, MIN_UNCERTAINTY, LOWEST_OVERLAP, EXACT_BASELINE]
+methods = [LOWEST_OVERLAP, EXACT_BASELINE]
 
 reviews = merge_reviews(read_data(n=reviews_count))
 #print(reviews)
