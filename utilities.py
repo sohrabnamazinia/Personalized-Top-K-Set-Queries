@@ -1,7 +1,9 @@
+from enum import Enum
 import itertools
 
 LOWEST_OVERLAP, MIN_UNCERTAINTY, EXACT_BASELINE, NAIVE = "Lowest_Overlap", "Min_Uncertainty", "Exact_Baseline", "Naive"
 RELEVANCE, DIVERSITY = "relevance", "diversity"
+
 
 class TopKResult:
     def __init__(self, algorithm, candidates_set, time, api_calls, entropydep) -> None:
@@ -11,6 +13,11 @@ class TopKResult:
         self.api_calls = api_calls
         # self.entropy = entropy
         self.entropydep = entropydep
+
+class Dataset(Enum):
+    HOTEL_REVIEWS : 1
+    MOVIE_PLOTS : 2
+    
 
 def read_documents(input_file=None, n=4, mock_llms=False):
     if mock_llms:
