@@ -14,11 +14,18 @@ class TopKResult:
         # self.entropy = entropy
         self.entropydep = entropydep
 
-class Dataset(Enum):
-    HOTEL_REVIEWS : 1
-    MOVIE_PLOTS : 2
+class ComponentsTime:
+    def __init__(self, total_time_init_candidates_set = None, total_time_update_bounds = None, total_time_compute_pdf = None, total_time_determine_next_question = None, total_time_llm_response = None, total_time=None) -> None:
+        self.total_time_init_candidates_set = total_time_init_candidates_set
+        self.total_time_update_bounds = total_time_update_bounds
+        self.total_time_compute_pdf = total_time_compute_pdf
+        self.total_time_determine_next_question = total_time_determine_next_question
+        self.total_time_llm_response = total_time_llm_response
+        if total_time != None:
+            self.total_time = total_time
+        else:
+            self.total_time = total_time_init_candidates_set + total_time_update_bounds + total_time_compute_pdf + total_time_determine_next_question + total_time_llm_response
     
-
 def read_documents(input_file=None, n=4, mock_llms=False):
     if mock_llms:
         return [""] * n

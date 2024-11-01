@@ -1,0 +1,4 @@
+n,k,method,total_time_init_candidates_set,total_time_update_bounds,total_time_compute_pdf,total_time_determine_next_question,total_time_llm_response,total_time
+10,2,Exact_Baseline,,,,,,81.82850694656372
+10,2,Naive,,,,,,78.51641392707825
+10,2,Lowest_Overlap,2.002716064453125e-05,0.00011682510375976562,2.6302969455718994,0.0018184185028076172,6.574500799179077,9.206753015518188

@@ -1,0 +1,2 @@
+n,k,method,total_time_init_candidates_set,total_time_update_bounds,total_time_compute_pdf,total_time_determine_next_question,total_time_llm_response,total_time
+10,2,Min_Uncertainty,2.5033950805664062e-05,0.00019979476928710938,5.261639595031738,0.008193731307983398,14.080942630767822,19.351000785827637
