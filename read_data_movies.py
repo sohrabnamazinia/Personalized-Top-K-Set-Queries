@@ -3,7 +3,7 @@ import pandas as pd
 def read_data(input_file="wiki_movie_plots_deduped.csv", n=1000):
     nRowsRead = n
     input_path = "dataset_movies/" + input_file
-    df = pd.read_csv(input_path, delimiter=',', nrows=nRowsRead)
+    df = pd.read_csv(input_path, nrows=nRowsRead, delimiter=',')
     
     # Filter out rows with missing plot descriptions
     df_filtered = df[df['Plot'].notna()]

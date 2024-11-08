@@ -1,7 +1,3 @@
 n,k,method,api_calls
-10,2,Exact_Baseline,45
-10,2,Min_Uncertainty,16
-10,2,Lowest_Overlap,8
-10,4,Exact_Baseline,45
-10,4,Min_Uncertainty,38
-10,4,Lowest_Overlap,34
+10,2,Lowest_Overlap,31
+10,4,Lowest_Overlap,53

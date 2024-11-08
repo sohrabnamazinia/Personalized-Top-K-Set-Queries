@@ -1,5 +1,5 @@
 from langchain_openai import ChatOpenAI
-from read_data_hotel_reviews import read_data, read_data_fake
+from read_data_hotels import read_data, read_data_fake
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser
 from langchain.agents import AgentExecutor, create_openai_tools_agent

@@ -32,18 +32,18 @@ class Metric:
             mask = np.triu(np.ones((self.n, self.m)), k=1)
             self.table = np.where(mask, self.table, None)
     
-    def call_all(self, documents, query=None):
+    def call_all(self, documents, query=None, relevance_definition=None, diversity_definition=None):
         # relevance table
         if query != None:
             for d in range(self.m):
-                value = call_llm_relevance(query, d, documents)
+                value = call_llm_relevance(query, d, documents, relevance_definition=relevance_definition)
                 self.set(0, d, value)
 
         # diversity table
         else:
             for d1 in range(self.n):
                 for d2 in range(self.m):
-                    value = call_llm_diversity(d1, d2, documents)
+                    value = call_llm_diversity(d1, d2, documents, diversity_definition=diversity_definition)
                     self.set(d1, d2, value)
 
     def peek_value(self, i, j=0):
@@ -53,35 +53,35 @@ class Metric:
     def __str__(self):
         return f"Table(name={self.name}, shape=({self.n}, {self.m}))\n{self.table}"
 
-def call_all_llms_relevance(input_query, documents, relevance_table, candidates_set, k, mocked_table = None):
+def call_all_llms_relevance(input_query, documents, relevance_table, candidates_set, k, mocked_table = None, relevance_definition=None):
     # relevance 
     n = relevance_table.m
     mock_table = mocked_table is not None
 
     for d in range(n):
         # check if llm should be mocked or not and get value based on this condition
-        value = call_llm_relevance(input_query, d, documents, mocked_table) if mock_table else call_llm_relevance(input_query, d, documents)
+        value = call_llm_relevance(input_query, d, documents, mocked_table) if mock_table else call_llm_relevance(input_query, d, documents, relevance_definition=relevance_definition)
         relevance_table.set(0, d, value)
         candidates_set, updated_candidates = update_lb_ub_relevance(candidates_set, d, value, k)
     return candidates_set, updated_candidates
 
-def call_llm_relevance(query, d, documents, relevance_table = None):
+def call_llm_relevance(query, d, documents, relevance_definition=None, relevance_table = None):
     # Case: Mocked LLM - d is integer
     if relevance_table is not None:
         return relevance_table[0][d]
     
     # Case: Real LLM - d is the string document
-    api = LLMApi()
+    api = LLMApi(relevance_definition=relevance_definition)
     result = api.call_llm_relevance(query, documents[d])
     return result
 
-def call_llm_diversity(d1, d2, documents, diversity_table = None):
+def call_llm_diversity(d1, d2, documents, diversity_table = None, diversity_definition = None):
     # Case: Mocked LLM - d is integer
     if diversity_table is not None:
         return diversity_table[d1][d2]
     
     # Case: Real LLM - d is the string document
-    api = LLMApi()
+    api = LLMApi(diversity_definition=diversity_definition)
     result = api.call_llm_diversity(documents[d1], documents[d2])
     return result
 
@@ -406,7 +406,7 @@ def call_entropy_discrete_2D(candidates_set:dict, diversity_table:Metric,relevan
     # print(candidates_set, entropy)
     return round(entropy, 4)
 
-def find_top_k_lowest_overlap(input_query, documents, k, metrics, mocked_tables = None):
+def find_top_k_lowest_overlap(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None):
     # init candidates set and tables
     algorithm = LOWEST_OVERLAP
     n = len(documents)
@@ -424,7 +424,7 @@ def find_top_k_lowest_overlap(input_query, documents, k, metrics, mocked_tables 
     # entropy_over_time.append(call_entropy(candidates_set))
     # entropy_dep_over_time.append(call_entropy_dependence(candidates_set))
     # use all relevance llm calls
-    candidates_set, _ = call_all_llms_relevance(input_query, documents, relevance_table, candidates_set, k, mocked_tables[0] if mocked_tables is not None else None)
+    candidates_set, _ = call_all_llms_relevance(input_query, documents, relevance_table, candidates_set, k, mocked_tables[0] if mocked_tables is not None else None, relevance_definition=relevance_definition)
 
     # algorithm
     count = n
@@ -443,7 +443,7 @@ def find_top_k_lowest_overlap(input_query, documents, k, metrics, mocked_tables 
         if pair is not None: i, j = pair
         else: break 
         start_time_llm_response = time.time()
-        value = call_llm_diversity(i, j, documents, mocked_tables[1] if mocked_tables is not None else None)
+        value = call_llm_diversity(i, j, documents, mocked_tables[1] if mocked_tables is not None else None, diversity_definition=diversity_definition)
         total_time_llm_response += time.time() - start_time_llm_response
         count += 1
         diversity_table.set(i, j, value)
@@ -462,7 +462,7 @@ def find_top_k_lowest_overlap(input_query, documents, k, metrics, mocked_tables 
     return TopKResult(algorithm, candidates_set, componentsTime, count, entropy_discrete_2D) 
 
 
-def find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables = None):
+def find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None):
     # init candidates set and tables
     algorithm = MIN_UNCERTAINTY
     start_time = time.time()
@@ -481,7 +481,7 @@ def find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables
     # entropy_over_time.append(call_entropy(candidates_set))
     # entropy_dep_over_time.append(call_entropy_dependence(candidates_set))
     # use all relevance llm calls
-    candidates_set, _ = call_all_llms_relevance(input_query, documents, relevance_table, candidates_set, k, mocked_tables[0] if mocked_tables is not None else None)
+    candidates_set, _ = call_all_llms_relevance(input_query, documents, relevance_table, candidates_set, k, mocked_tables[0] if mocked_tables is not None else None, relevance_definition=relevance_definition)
     
     # algorithm
     count = n
@@ -500,7 +500,7 @@ def find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables
         if pair is not None: i, j = pair
         else: break 
         start_time_llm_response = time.time()
-        value = call_llm_diversity(i, j, documents, mocked_tables[1] if mocked_tables is not None else None)
+        value = call_llm_diversity(i, j, documents, mocked_tables[1] if mocked_tables is not None else None, diversity_definition=diversity_definition)
         total_time_llm_response += time.time() - start_time_llm_response
         count += 1
         diversity_table.set(i, j, value)
@@ -518,13 +518,13 @@ def find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables
     componentsTime = ComponentsTime(total_time_init_candidates_set=total_time_init_candidates_set, total_time_update_bounds=total_time_update_bounds, total_time_compute_pdf=total_time_compute_pdf, total_time_determine_next_question=total_time_determine_next_question, total_time_llm_response=total_time_llm_response)
     return TopKResult(algorithm, candidates_set, componentsTime, count, entropy_discrete_2D) 
 
-def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables = None):
+def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None):
     # init candidate set and tables
     algorithm = EXACT_BASELINE
     start_time = time.time()
     n = len(documents)
     candidates_set = init_candidates_set(n, k, 0, len(metrics))
-    print(candidates_set)
+    #print(candidates_set)
     mock_tables = mocked_tables is not None
     relevance_table = Metric(metrics[0], 1 ,n)
     diversity_table = Metric(metrics[1], n ,n)
@@ -532,8 +532,8 @@ def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables 
         relevance_table.set_all(mocked_tables[0])
         diversity_table.set_all(mocked_tables[1])
     else:
-        relevance_table.call_all(documents, input_query)
-        diversity_table.call_all(documents)
+        relevance_table.call_all(documents, input_query, relevance_definition=relevance_definition)
+        diversity_table.call_all(documents, diversity_definition=diversity_definition)
     
     # entropy = call_entropy(candidates_set, algorithm)
     entropy_dep = call_entropy_discrete_2D(candidates_set,diversity_table,relevance_table, algorithm)
@@ -550,7 +550,7 @@ def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables 
     duration = ComponentsTime(total_time=total_time)
     return TopKResult(algorithm, result, duration, choose_2(n), entropy_dep)
 
-def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None):
+def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None):
     # init candidate set and tables
     entropy_over_time = []
     entropy_dep_over_time = []
@@ -567,8 +567,8 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None):
         relevance_table.set_all(mocked_tables[0])
         diversity_table.set_all(mocked_tables[1])
     else:
-        relevance_table.call_all(documents, input_query)
-        diversity_table.call_all(documents)
+        relevance_table.call_all(documents, input_query, relevance_definition=relevance_definition)
+        diversity_table.call_all(documents, diversity_definition=diversity_definition)
     
     for d in range(relevance_table.m):
         # update bounds
@@ -729,7 +729,7 @@ def prune(candidates_set, updated_keys):
             candidates_set.pop(key)
     return candidates_set
 
-def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms = False, is_output_discrete=True):
+def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms = False, is_output_discrete=True, relevance_definition = None, diversity_definition = None):
     results = []
     mocked_tables = None
     n = len(documents)
@@ -745,16 +745,16 @@ def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms
         print(diversity_table)
     
     if EXACT_BASELINE in methods:
-        results.append(find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables=mocked_tables))
+        results.append(find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition))
 
     if NAIVE in methods:
-        results.append(find_top_k_Naive(input_query, documents, k, metrics, mocked_tables=mocked_tables))
+        results.append(find_top_k_Naive(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition))
 
     if MIN_UNCERTAINTY in methods:
-        results.append(find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables=mocked_tables))
+        results.append(find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition))
     
     if LOWEST_OVERLAP in methods:
-        results.append(find_top_k_lowest_overlap(input_query, documents, k, metrics, mocked_tables=mocked_tables))
+        results.append(find_top_k_lowest_overlap(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition))
     
     return results
 
@@ -784,19 +784,19 @@ def store_results(results):
 
 # # # inputs
 # input_query = "I need a phone which is iPhone and has great storage"
+# relevance_definition = "Relevance"
+# diversity_definition = "Diversity"
 # input_path = "documents.txt"
 # n = 5
 # k = 2
 # metrics = [RELEVANCE, DIVERSITY]
 # methods = [LOWEST_OVERLAP]
-# #methods = [MIN_UNCERTAINTY]
-# #methods = ["Exact_Baseline", "Naive"]
 # mock_llms = False
 # seed = 42
 
 # # run
 # documents = read_documents(input_path, n, mock_llms)
-# results = find_top_k(input_query, documents, k, metrics, methods, seed, mock_llms)
+# results = find_top_k(input_query, documents, k, metrics, methods, seed, mock_llms, relevance_definition=relevance_definition, diversity_definition=diversity_definition)
 
 # # store results
 # store_results(results)
