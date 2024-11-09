@@ -4,11 +4,13 @@ import time
 from LLMApi import LLMApi
 from copy import deepcopy
 import math
+import csv
 from utilities import RELEVANCE, DIVERSITY, NAIVE, MIN_UNCERTAINTY, LOWEST_OVERLAP, EXACT_BASELINE, TopKResult, ComponentsTime, read_documents, init_candidates_set, check_pair_exist, choose_2, compute_exact_scores_baseline, check_prune
 
 class Metric:
-    def __init__(self, name: str, n: int, m: int):
+    def __init__(self, name: str, n: int, m: int, dataset_name):
         self.name = name
+        self.dataset_name = dataset_name
         self.table = np.full((n, m), None, dtype=object)
         self.n = n
         self.m = m
@@ -32,19 +34,37 @@ class Metric:
             mask = np.triu(np.ones((self.n, self.m)), k=1)
             self.table = np.where(mask, self.table, None)
     
-    def call_all(self, documents, query=None, relevance_definition=None, diversity_definition=None):
-        # relevance table
-        if query != None:
-            for d in range(self.m):
-                value = call_llm_relevance(query, d, documents, relevance_definition=relevance_definition)
-                self.set(0, d, value)
 
-        # diversity table
+    def call_all(self, documents, query=None, relevance_definition=None, diversity_definition=None):
+        # Relevance table
+        if query is not None:
+            relevance_csv = f"MGT_{self.dataset_name}_{self.m}_Rel_{relevance_definition}.csv"
+            with open(relevance_csv, mode='w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(['d', 'value', 'time_rel'])
+
+                for d in range(self.m):
+                    start_time_rel = time.time()
+                    value = call_llm_relevance(query, d, documents, relevance_definition=relevance_definition)
+                    time_rel = time.time() - start_time_rel
+                    self.set(0, d, value)
+                    writer.writerow([d, value, time_rel])
+
+        # Diversity table
         else:
-            for d1 in range(self.n):
-                for d2 in range(self.m):
-                    value = call_llm_diversity(d1, d2, documents, diversity_definition=diversity_definition)
-                    self.set(d1, d2, value)
+            diversity_csv = f"MGT_{self.dataset_name}_{self.n}_Div_{diversity_definition}.csv"
+            with open(diversity_csv, mode='w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(['d2', 'd1', 'value', 'time_div'])
+
+                for d1 in range(self.n):
+                    for d2 in range(d1):
+                        start_time_div = time.time()
+                        value = call_llm_diversity(d1, d2, documents, diversity_definition=diversity_definition)
+                        time_div = time.time() - start_time_div
+                        self.set(d2, d1, value)
+                        writer.writerow([d2, d1, value, time_div])
+
 
     def peek_value(self, i, j=0):
         if self.name == "relevance": return self.table[0, i]
@@ -518,7 +538,7 @@ def find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables
     componentsTime = ComponentsTime(total_time_init_candidates_set=total_time_init_candidates_set, total_time_update_bounds=total_time_update_bounds, total_time_compute_pdf=total_time_compute_pdf, total_time_determine_next_question=total_time_determine_next_question, total_time_llm_response=total_time_llm_response)
     return TopKResult(algorithm, candidates_set, componentsTime, count, entropy_discrete_2D) 
 
-def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None):
+def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None, dataset_name = None):
     # init candidate set and tables
     algorithm = EXACT_BASELINE
     start_time = time.time()
@@ -526,8 +546,8 @@ def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables 
     candidates_set = init_candidates_set(n, k, 0, len(metrics))
     #print(candidates_set)
     mock_tables = mocked_tables is not None
-    relevance_table = Metric(metrics[0], 1 ,n)
-    diversity_table = Metric(metrics[1], n ,n)
+    relevance_table = Metric(metrics[0], 1 ,n, dataset_name)
+    diversity_table = Metric(metrics[1], n ,n, dataset_name)
     if mock_tables:
         relevance_table.set_all(mocked_tables[0])
         diversity_table.set_all(mocked_tables[1])
@@ -550,7 +570,7 @@ def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables 
     duration = ComponentsTime(total_time=total_time)
     return TopKResult(algorithm, result, duration, choose_2(n), entropy_dep)
 
-def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None):
+def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None, dataset_name = None):
     # init candidate set and tables
     entropy_over_time = []
     entropy_dep_over_time = []
@@ -561,8 +581,8 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, r
     # entropy_over_time.append(call_entropy(candidates_set))
     # entropy_dep_over_time.append(call_entropy_discrete_2D(candidates_set))
     mock_tables = mocked_tables is not None
-    relevance_table = Metric(metrics[0], 1 ,n)
-    diversity_table = Metric(metrics[1], n ,n)
+    relevance_table = Metric(metrics[0], 1 ,n, dataset_name)
+    diversity_table = Metric(metrics[1], n ,n, dataset_name)
     if mock_tables:
         relevance_table.set_all(mocked_tables[0])
         diversity_table.set_all(mocked_tables[1])
@@ -729,7 +749,7 @@ def prune(candidates_set, updated_keys):
             candidates_set.pop(key)
     return candidates_set
 
-def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms = False, is_output_discrete=True, relevance_definition = None, diversity_definition = None):
+def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms = False, is_output_discrete=True, relevance_definition = None, diversity_definition = None, dataset_name = None):
     results = []
     mocked_tables = None
     n = len(documents)
@@ -745,10 +765,10 @@ def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms
         print(diversity_table)
     
     if EXACT_BASELINE in methods:
-        results.append(find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition))
+        results.append(find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name))
 
     if NAIVE in methods:
-        results.append(find_top_k_Naive(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition))
+        results.append(find_top_k_Naive(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name))
 
     if MIN_UNCERTAINTY in methods:
         results.append(find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition))
@@ -787,6 +807,7 @@ def store_results(results):
 # relevance_definition = "Relevance"
 # diversity_definition = "Diversity"
 # input_path = "documents.txt"
+# dataset_name = "datasetname"
 # n = 5
 # k = 2
 # metrics = [RELEVANCE, DIVERSITY]
@@ -796,7 +817,7 @@ def store_results(results):
 
 # # run
 # documents = read_documents(input_path, n, mock_llms)
-# results = find_top_k(input_query, documents, k, metrics, methods, seed, mock_llms, relevance_definition=relevance_definition, diversity_definition=diversity_definition)
+# results = find_top_k(input_query, documents, k, metrics, methods, seed, mock_llms, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name)
 
 # # store results
 # store_results(results)

@@ -4,12 +4,13 @@ from Ranking import find_top_k
 from utilities import RELEVANCE, DIVERSITY, NAIVE, MIN_UNCERTAINTY, LOWEST_OVERLAP, EXACT_BASELINE
 
 # List of (n, k) tuples for experimentation
-experiments = [(7, 2)]
+experiments = [(3, 2)]
+dataset_name = "hotels"
 input_query = "Affordable hotel"
 relevance_definition = "Rating of the hotel"
 diversity_definition = "Physical distance of the hotel"
 metrics = [RELEVANCE, DIVERSITY]
-methods = [LOWEST_OVERLAP]
+methods = [EXACT_BASELINE]
 output_file = "experiment_time_hotels.csv"
 
 # Open CSV file and write the header for time measurements
@@ -27,7 +28,7 @@ with open(output_file, mode='w', newline='') as file:
 
 for (n, k) in experiments:
     plots = merge_descriptions(read_data(n=n))
-    results = find_top_k(input_query, plots, k, metrics, methods, mock_llms=False, relevance_definition=relevance_definition, diversity_definition=diversity_definition)
+    results = find_top_k(input_query, plots, k, metrics, methods, mock_llms=False, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name)
     
     # Append each result's timing details into the CSV
     with open(output_file, mode='a', newline='') as file:
