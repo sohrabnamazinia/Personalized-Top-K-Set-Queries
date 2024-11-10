@@ -1,2 +1,0 @@
-n,k,method,total_time_init_candidates_set,total_time_update_bounds,total_time_compute_pdf,total_time_determine_next_question,total_time_llm_response,total_time
-3,2,Exact_Baseline,,,,,,4.2846739292144775

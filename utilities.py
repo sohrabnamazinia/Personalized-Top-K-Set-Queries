@@ -4,7 +4,6 @@ import itertools
 LOWEST_OVERLAP, MIN_UNCERTAINTY, EXACT_BASELINE, NAIVE = "Lowest_Overlap", "Min_Uncertainty", "Exact_Baseline", "Naive"
 RELEVANCE, DIVERSITY = "relevance", "diversity"
 
-
 class TopKResult:
     def __init__(self, algorithm, candidates_set, time, api_calls, entropydep) -> None:
         self.algorithm = algorithm

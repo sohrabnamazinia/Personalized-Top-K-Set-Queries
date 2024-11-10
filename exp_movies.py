@@ -3,16 +3,14 @@ from read_data_movies import read_data, merge_plots
 from Ranking import find_top_k
 from utilities import RELEVANCE, DIVERSITY, NAIVE, MIN_UNCERTAINTY, LOWEST_OVERLAP, EXACT_BASELINE
 
-# List of (n, k) tuples for experimentation
-experiments = [(7, 2)]
+experiments = [(6, 3)] 
 input_query = "A scary movie"
 relevance_definition = "Popularity of the movie"
 diversity_definition = "Genre and movie periods"
 metrics = [RELEVANCE, DIVERSITY]
-methods = [LOWEST_OVERLAP]
-output_file = "experiment_time_movies.csv"
+methods = [LOWEST_OVERLAP, EXACT_BASELINE]  
+output_file = "experiment_movies.csv"
 
-# Open CSV file and write the header for time measurements
 with open(output_file, mode='w', newline='') as file:
     writer = csv.writer(file)
     writer.writerow([
@@ -22,14 +20,14 @@ with open(output_file, mode='w', newline='') as file:
         "total_time_compute_pdf", 
         "total_time_determine_next_question", 
         "total_time_llm_response",
-        "total_time"
+        "total_time",
+        "api_calls"  
     ])
 
 for (n, k) in experiments:
-    plots = merge_plots(read_data(n=n))
-    results = find_top_k(input_query, plots, k, metrics, methods, mock_llms=False, relevance_definition=relevance_definition, diversity_definition=diversity_definition)
+    data = merge_plots(read_data(n=n))
+    results = find_top_k(input_query, data, k, metrics, methods, mock_llms=False, relevance_definition=relevance_definition, diversity_definition=diversity_definition)
     
-    # Append each result's timing details into the CSV
     with open(output_file, mode='a', newline='') as file:
         writer = csv.writer(file)
         for result in results:
@@ -40,7 +38,8 @@ for (n, k) in experiments:
                 result.time.total_time_compute_pdf,
                 result.time.total_time_determine_next_question,
                 result.time.total_time_llm_response,
-                result.time.total_time
+                result.time.total_time,
+                result.api_calls  
             ])
 
-print("Experiment completed. Results saved in", output_file)
+print("Experiment completed. Combined results saved in:", output_file)

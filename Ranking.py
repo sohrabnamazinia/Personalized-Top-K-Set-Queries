@@ -8,7 +8,7 @@ import csv
 from utilities import RELEVANCE, DIVERSITY, NAIVE, MIN_UNCERTAINTY, LOWEST_OVERLAP, EXACT_BASELINE, TopKResult, ComponentsTime, read_documents, init_candidates_set, check_pair_exist, choose_2, compute_exact_scores_baseline, check_prune
 
 class Metric:
-    def __init__(self, name: str, n: int, m: int, dataset_name):
+    def __init__(self, name: str, n: int, m: int, dataset_name = None):
         self.name = name
         self.dataset_name = dataset_name
         self.table = np.full((n, m), None, dtype=object)
@@ -568,7 +568,7 @@ def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables 
     print("*****************************")
     total_time=time.time() - start_time
     duration = ComponentsTime(total_time=total_time)
-    return TopKResult(algorithm, result, duration, choose_2(n), entropy_dep)
+    return TopKResult(algorithm, result, duration, choose_2(n) + n, entropy_dep)
 
 def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None, dataset_name = None):
     # init candidate set and tables
