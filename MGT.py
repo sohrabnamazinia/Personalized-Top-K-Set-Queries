@@ -4,7 +4,7 @@ from utilities import RELEVANCE, DIVERSITY
 import time
 
 # Inputs for MGT
-experiments = [16]  
+experiments = [16, 32, 64]  
 dataset_name = "hotels"
 input_query = "Affordable hotel"
 relevance_definition = "Rating_of_the_hotel"
