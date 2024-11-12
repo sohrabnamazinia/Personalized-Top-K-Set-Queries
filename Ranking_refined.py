@@ -5,7 +5,7 @@ from LLMApi import LLMApi
 from copy import deepcopy
 import math
 import csv
-from utilities import RELEVANCE, DIVERSITY, NAIVE, MIN_UNCERTAINTY, LOWEST_OVERLAP, EXACT_BASELINE, TopKResult, ComponentsTime, read_documents, init_candidates_set, check_pair_exist, choose_2, compute_exact_scores_baseline, check_prune
+from utilities import RELEVANCE, DIVERSITY, NAIVE, MIN_UNCERTAINTY, MAX_PROB, EXACT_BASELINE, TopKResult, ComponentsTime, read_documents, init_candidates_set, check_pair_exist, choose_2, compute_exact_scores_baseline, check_prune
 
 class Metric:
     def __init__(self, name: str, n: int, m: int, dataset_name = None):
@@ -316,9 +316,9 @@ def call_entropy_discrete_2D(candidates_set:dict, diversity_table:Metric,relevan
     # print(candidates_set, entropy)
     return round(entropy, 3), probabilities_candidate
 
-def find_top_k_lowest_overlap(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None):
+def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None):
     # init candidates set and tables
-    algorithm = LOWEST_OVERLAP
+    algorithm = MAX_PROB
     n = len(documents)
     start_time_init_candidates_set = time.time()
     total_time_update_bounds = 0
@@ -352,7 +352,7 @@ def find_top_k_lowest_overlap(input_query, documents, k, metrics, mocked_tables 
         # entropy_over_time.append(entropy)
         entropy_discrete_2D.append(entropy_dep)
         start_time_determine_next_question = time.time()
-        pair = choose_next_llm_diversity_lowest_overlap(diversity_table, candidates_set, probabilities_cand, determined_qs)
+        pair = choose_next_llm_diversity_max_prob(diversity_table, candidates_set, probabilities_cand, determined_qs)
         total_time_determine_next_question += time.time() - start_time_determine_next_question
         if pair is not None: i, j = pair
         else: break 
@@ -371,7 +371,7 @@ def find_top_k_lowest_overlap(input_query, documents, k, metrics, mocked_tables 
     entropy_dep, probabilities_cand = call_entropy_discrete_2D(candidates_set,diversity_table,relevance_table)
     entropy_discrete_2D.append(entropy_dep)
     print("*************************************")
-    print("Result - Lowest Overlap: \n", candidates_set)
+    print("Result - Max probability: \n", candidates_set)
     print("Total number of calls: " , count)
     # print("Final entropy: ", entropy_over_time[-1])
     componentsTime = ComponentsTime(total_time_init_candidates_set=total_time_init_candidates_set, total_time_update_bounds=total_time_update_bounds, total_time_compute_pdf=total_time_compute_pdf, total_time_determine_next_question=total_time_determine_next_question, total_time_llm_response=total_time_llm_response)
@@ -491,7 +491,7 @@ def choose_random_qs(setofdocs, already_qsd):
     already_qsd.append(pair)
     return i, j
 
-def choose_next_llm_diversity_lowest_overlap(diversity_table, candidates_set, probabilities_cand, determined_qs):       
+def choose_next_llm_diversity_max_prob(diversity_table, candidates_set, probabilities_cand, determined_qs):       
     # print(probabilities_cand)
     winner_cand = max(probabilities_cand, key=probabilities_cand.get)     
     candidate_pairs = list(itertools.combinations(winner_cand, 2))
@@ -597,8 +597,8 @@ def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms
     # if MIN_UNCERTAINTY in methods:
         # results.append(find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition))
     
-    if LOWEST_OVERLAP in methods:
-        results.append(find_top_k_lowest_overlap(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition))
+    if MAX_PROB in methods:
+        results.append(find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition))
     
     return results
 
@@ -635,7 +635,7 @@ dataset_name = "datasetname"
 n = 10
 k = 5
 metrics = [RELEVANCE, DIVERSITY]
-methods = [NAIVE, LOWEST_OVERLAP]
+methods = [NAIVE, MAX_PROB]
 # methods = [NAIVE]
 mock_llms = True
 seed = 42

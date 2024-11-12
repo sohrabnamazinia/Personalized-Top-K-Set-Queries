@@ -1,7 +1,7 @@
 from enum import Enum
 import itertools
 
-LOWEST_OVERLAP, MIN_UNCERTAINTY, EXACT_BASELINE, NAIVE = "Lowest_Overlap", "Min_Uncertainty", "Exact_Baseline", "Naive"
+MAX_PROB, MIN_UNCERTAINTY, EXACT_BASELINE, NAIVE = "Max_Prob", "Min_Uncertainty", "Exact_Baseline", "Naive"
 RELEVANCE, DIVERSITY = "relevance", "diversity"
 
 class TopKResult:
