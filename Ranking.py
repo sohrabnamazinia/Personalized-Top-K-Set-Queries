@@ -5,6 +5,7 @@ from LLMApi import LLMApi
 from copy import deepcopy
 import math
 import csv
+import random
 from utilities import RELEVANCE, DIVERSITY, NAIVE, MIN_UNCERTAINTY, LOWEST_OVERLAP, EXACT_BASELINE, TopKResult, ComponentsTime, read_documents, init_candidates_set, check_pair_exist, choose_2, compute_exact_scores_baseline, check_prune
 
 class Metric:
@@ -33,6 +34,64 @@ class Metric:
         if self.n > 1:
             mask = np.triu(np.ones((self.n, self.m)), k=1)
             self.table = np.where(mask, self.table, None)
+    
+    def call_all_randomized_involved(self, documents, query=None, relevance_definition=None, diversity_definition=None, sequential_randomized_length = 16668):
+        mean = 0.57
+        std_dev = 0.1
+        values_choices = [i * 0.1 for i in range(11)]
+
+        # Relevance table
+        if query is not None:
+            relevance_csv = f"MGT_{self.dataset_name}_{self.m}_Rel_{relevance_definition}.csv"
+            with open(relevance_csv, mode='w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(['d', 'value', 'time_rel'])
+
+                counter = 0
+                for d in range(self.m):
+                    if counter % 1000 == 0:
+                        print("Rel call for document: " + str(d))
+                    if counter % sequential_randomized_length == 0:
+                        start_time_rel = time.time()
+                        value = call_llm_relevance(query, d, documents, relevance_definition=relevance_definition)
+                        time_rel = time.time() - start_time_rel
+                        self.set(0, d, value)
+                        writer.writerow([d, value, time_rel])
+                    else:
+                        value = round(random.choice(values_choices), 1)
+                        time_rel = np.random.normal(mean, std_dev)
+                        time_rel = min(max(0.1, time_rel), 1.1)
+                        self.set(0, d, value)
+                        writer.writerow([d, value, time_rel])
+                    counter += 1
+                    
+
+        # Diversity table
+        else:
+            diversity_csv = f"MGT_{self.dataset_name}_{self.n}_Div_{diversity_definition}.csv"
+            with open(diversity_csv, mode='w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(['d2', 'd1', 'value', 'time_div'])
+
+                counter = 0
+                for d1 in range(self.n):
+                    for d2 in range(d1):
+                        if counter % 10000 == 0:
+                            print("Div call for documents: " + str(d2) + ", " + str(d1))
+                        if counter % sequential_randomized_length == 0:
+                            print("calling lLM for documents: " + str(d2) + ", " + str(d1))
+                            start_time_div = time.time()
+                            value = call_llm_diversity(d1, d2, documents, diversity_definition=diversity_definition)
+                            time_div = time.time() - start_time_div
+                            self.set(d2, d1, value)
+                            writer.writerow([d2, d1, value, time_div])
+                        else:
+                            value = round(random.choice(values_choices), 1)
+                            time_div = np.random.normal(mean, std_dev)
+                            time_div = min(max(0.1, time_div), 1.1)
+                            self.set(d2, d1, value)
+                            writer.writerow([d2, d1, value, time_div])
+                        counter += 1
     
 
     def call_all(self, documents, query=None, relevance_definition=None, diversity_definition=None):
