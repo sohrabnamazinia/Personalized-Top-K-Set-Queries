@@ -3,7 +3,7 @@ OPENAI_API_KEY.txt
 
 # Ignore virtual environment
 llm/
-dataset_hotels/
+dataset_hotelss/
 dataset_moviess/
 .venv/
 
