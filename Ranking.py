@@ -6,7 +6,7 @@ from copy import deepcopy
 import math
 import csv
 import random
-from utilities import RELEVANCE, DIVERSITY, NAIVE, MIN_UNCERTAINTY, LOWEST_OVERLAP, EXACT_BASELINE, TopKResult, ComponentsTime, read_documents, init_candidates_set, check_pair_exist, choose_2, compute_exact_scores_baseline, check_prune
+from utilities import RELEVANCE, DIVERSITY, NAIVE, MIN_UNCERTAINTY, MAX_PROB, EXACT_BASELINE, TopKResult, ComponentsTime, read_documents, init_candidates_set, check_pair_exist, choose_2, compute_exact_scores_baseline, check_prune
 
 class Metric:
     def __init__(self, name: str, n: int, m: int, dataset_name = None):
@@ -92,8 +92,8 @@ class Metric:
                             self.set(d2, d1, value)
                             writer.writerow([d2, d1, value, time_div])
                         counter += 1
-    
 
+    
     def call_all(self, documents, query=None, relevance_definition=None, diversity_definition=None):
         # Relevance table
         if query is not None:
@@ -123,6 +123,7 @@ class Metric:
                         time_div = time.time() - start_time_div
                         self.set(d2, d1, value)
                         writer.writerow([d2, d1, value, time_div])
+    
 
 
     def peek_value(self, i, j=0):
@@ -139,7 +140,7 @@ def call_all_llms_relevance(input_query, documents, relevance_table, candidates_
 
     for d in range(n):
         # check if llm should be mocked or not and get value based on this condition
-        value = call_llm_relevance(input_query, d, documents, mocked_table) if mock_table else call_llm_relevance(input_query, d, documents, relevance_definition=relevance_definition)
+        value = call_llm_relevance(input_query, d, documents, relevance_table=mocked_table) if mock_table else call_llm_relevance(input_query, d, documents, relevance_definition=relevance_definition)
         relevance_table.set(0, d, value)
         candidates_set, updated_candidates = update_lb_ub_relevance(candidates_set, d, value, k)
     return candidates_set, updated_candidates
@@ -164,190 +165,6 @@ def call_llm_diversity(d1, d2, documents, diversity_table = None, diversity_defi
     result = api.call_llm_diversity(documents[d1], documents[d2])
     return result
 
-# def prob_score(bound, other_bound):
-    c_lb, c_ub = bound
-    o_lb, o_ub = other_bound
-    # edge cases
-    if c_lb > o_ub: 
-        return 1
-    if c_ub < o_lb:
-        return 0
-    if c_lb == o_lb and c_ub == o_ub:
-        return 0.5
-    # usual case if c and o partially overlap with c range > o range
-    if c_ub > o_ub and c_lb > o_lb:
-        return 0.5 + 0.5**3 + 0.5**2
-    # usual case if c and o partially overlap with c range < o range
-    if (c_ub < o_ub and c_lb < o_lb):
-        return 0.5**3
-    # other cases of complete overlap with equal bound on one end
-    if (c_ub < o_ub and c_lb > o_lb) or (c_ub > o_ub and c_lb < o_lb):
-        return 1/3 + 1/3*1/2
-    if (c_lb == o_lb and c_ub > o_ub) or (c_ub == o_ub and c_lb > o_lb):
-        return 0.5 + 0.5**2
-    if (c_lb == o_lb and c_ub < o_ub) or (c_ub == o_ub and c_lb < o_lb):
-        return 0.5**2
-
-# def call_entropy(candidates_set, algorithm= None):
-    if algorithm == NAIVE or algorithm == EXACT_BASELINE:
-        return 0
-    if len(candidates_set) == 1:
-        return 0  # When only 1 candidate is left, it is clearly the winner now so entropy becomes 0 automatically
-    probabilities_candidate = {}
-    mock_set = deepcopy(candidates_set)
-    for cand, bound in candidates_set.items():
-        mock_set.pop(cand)
-        for other_cand, other_bound in mock_set.items():
-            prob_score_cand = prob_score(bound, other_bound)
-            prob_score_other = 1 - prob_score_cand
-            probabilities_candidate[cand] = probabilities_candidate.get(cand, 1) * prob_score_cand
-            probabilities_candidate[other_cand] = probabilities_candidate.get(other_cand, 1) * prob_score_other
-    # print(probabilities_candidate)
-    entropy = -sum(map(lambda p: 0 if p==0 else p * math.log2(p), probabilities_candidate.values()))
-    # print(candidates_set, entropy)
-    return round(entropy, 4)
-
-# def prob_score_dep(bound, other_bound):
-    """A probability scoring function that checks if candidata > other candidate w.r.t their bounds. The bounds are update
-    accordingly to indicate the range in which they are greater than the other candidate. It also calculates the complement
-    probability and returns the bounds of the other candidate where it is greater than the candidate. It returns the 2 probabilities
-    and 2 bounds indicating where cand > other and other > cand respectively."""
-    c_lb, c_ub = bound
-    o_lb, o_ub = other_bound
-    
-    # edge cases
-    if c_lb > o_ub: 
-        return 1, bound
-    if c_ub < o_lb:
-        return 0, None
-    if c_lb == o_lb and c_ub == o_ub:
-        return 0.5, bound
-    # usual case if c and o partially overlap with c range > o range
-    if c_ub > o_ub and c_lb > o_lb:
-        prob = 0.5 + 0.5**3 + 0.5**2
-        return prob, bound
-    # usual case if c and o partially overlap with c range < o range
-    if (c_ub < o_ub and c_lb < o_lb):
-        prob = 0.5**3
-        return prob, (o_lb, c_ub)
-    # other cases of complete overlap with equal bound on one end
-    if (c_ub < o_ub and c_lb > o_lb):
-        prob = 1/3 + 1/3*1/2
-        return prob, bound
-    if (c_ub > o_ub and c_lb < o_lb):
-        prob = 1/3 + 1/3*1/2
-        return prob, (o_lb, c_ub)
-    if (c_lb == o_lb and c_ub > o_ub):
-        prob = 0.5 + 0.5**2
-        return prob, bound
-    if (c_ub == o_ub and c_lb > o_lb):
-        prob = 0.5 + 0.5**2
-        return prob, bound
-    if (c_lb == o_lb and c_ub < o_ub): 
-        prob = 0.5**2
-        return prob, bound
-    if (c_ub == o_ub and c_lb < o_lb):
-        prob = 0.5**2
-        return prob, (o_lb, c_ub)
-    
-# def call_entropy_dependence(candidates_set, algorithm= None):
-    if algorithm == NAIVE or algorithm == EXACT_BASELINE:
-        return 0
-    if len(candidates_set) == 1:
-        return 0  # When only 1 candidate is left, it is clearly the winner now so entropy becomes 0 automatically
-    probabilities_candidate = {}
-    # mock_set = deepcopy(candidates_set)
-    for cand, bound in candidates_set.items():
-        cand_poss_bound = bound #if cand_poss == None else cand_poss[1] # possible candidate bound initialized with its original bound if it does not already exist in prob_cand list
-        for other_cand, other_bound in candidates_set.items():
-            if other_cand == cand: continue
-            prob_score_cand, cand_poss_bound = prob_score_dep(cand_poss_bound, other_bound)  # get the prob score and the complement score along with the possible bounds for each case
-            x_val = probabilities_candidate.get(cand, 1) 
-            if prob_score_cand == 0:
-                probabilities_candidate[cand] = 0
-                break  # if a candidate ever gets 0 probability w.r.t. other candidates, it's probability score of being the winner becomes 0, so it does not need to be computed any further
-            probabilities_candidate[cand] = x_val * prob_score_cand
-            
-    entropy = -sum(map(lambda p: 0 if p==0 else p * math.log2(p), probabilities_candidate.values()))
-    print(candidates_set, entropy)
-    return round(entropy, 4)
-
-def gen_2d(grouped_pairs:list):
-    all_tables = {}
-    for pairs in grouped_pairs:
-        if len(pairs) == 2:
-            table_name = tuple([p[0] for p in pairs])
-            all_tables[table_name] = []
-            bounds = [p[1] for p in pairs]
-            c_lb, c_ub = bounds[0]
-            o_lb, o_ub = bounds[1]
-            c_lb, c_ub, o_lb, o_ub = int(c_lb*10), int(c_ub*10), int(o_lb*10), int(o_ub*10)
-            for c in range(c_lb, c_ub+1):
-                for o in range(o_lb, o_ub+1):
-                    if c >= o:
-                        all_tables[table_name].append((c,o, 1))
-                    else:
-                        all_tables[table_name].append((c,o, 0))
-            # print(all_tables[table_name])
-        elif len(pairs) == 1:
-            table_name = tuple([p[0] for p in pairs])
-            bounds = [p[1] for p in pairs]
-            all_tables[table_name] = []
-            c_lb, c_ub = bounds[0]
-            c_lb, c_ub = int(c_lb*10), int(c_ub*10)
-            for c in range(c_lb, c_ub+1):
-                all_tables[table_name].append((c,1))
-    return all_tables
-
-# def scoring_func(cand, all_2d: dict):
-    req_table = None
-    req_table_vals = None
-    remember_comp = []
-    for table_names in all_2d.keys():
-        if cand in table_names:
-            req_table = table_names
-            req_table_vals = all_2d[table_names]
-            break
-    flag = 1
-    if cand == req_table[0]:
-        num = [vals[:-1] for vals in req_table_vals if 1 in vals]
-    else:
-        num = [vals[:-1] for vals in req_table_vals if 0 in vals]
-        flag = 2
-    # c_vals = [v[0] for v in num]
-    # remember_comp.extend(num)
-    # print("req",  req_table)
-    numer = len(num)
-    denom = len(req_table_vals)
-    prob = numer/denom
-    if prob == 0: return 0
-    mock_table = deepcopy(all_2d)
-    mock_table.pop(req_table)
-    for table_v in mock_table.values():
-        count = 0
-        temp = []
-        # print("num", num)
-        for n in num:
-            for vals in table_v:    
-                if flag == 1:
-                    if n[0] == max(n[0], max(vals[:-1])):
-                        count += 1
-                        # remember_comp.append((n, vals[:-1]))
-                        temp.append(n + vals[:-1])
-                elif flag == 2:
-                    if n[1] == max(n[1], max(vals[:-1])):
-                        count += 1
-                        # remember_comp.append((n, vals[:-1]))
-                        temp.append(n + vals[:-1])    
-        num = temp
-        # print("tab", tables)
-        denom = denom * len(table_v)
-        numer = count
-        print(count, denom)
-        prob = count/denom
-        if prob == 0: return 0
-    return prob
-
 def common_ele(cand, cand_bound, other, other_bound, div_tab:Metric, rel_tab:Metric):
     '''Checks for common elements between 2 candidates and accordingly calculates conditional probability'''
     common = []
@@ -358,28 +175,77 @@ def common_ele(cand, cand_bound, other, other_bound, div_tab:Metric, rel_tab:Met
     # print(rel_tab)
     rel_c1 = sum(map(lambda doc: rel_tab.peek_value(doc), cand))/k # relevance score for c1
     rel_c2 = sum(map(lambda doc: rel_tab.peek_value(doc), other))/k # relevance score for c2
-    rel_c1, rel_c2 = int(rel_c1*10), int(rel_c2*10)
+    rel_c1 = rel_c1 * 10
+    rel_c2 = rel_c2 *10
+    # if math.ceil(rel_c1*10) > c1lb: rel_c1 = c1lb
+    # else: rel_c1 = math.ceil(rel_c1*10)
+    # if math.ceil(rel_c2*10) > c2lb: rel_c2 = c2lb
+    # else: rel_c2 = math.ceil(rel_c2*10)
     for docs in cand:
         if docs in other: common.append(docs)
     # print(k, c1, c2, common)
+    div_c1_lb = 0
+    div_c1_ub = 0
+    denom_c1 = 0
+    div_c2_lb = 0
+    div_c2_ub = 0
+    denom_c2 = 0
+    old_c1lb = c1lb
+    old_c1ub = c1ub
+    old_c2lb = c2lb
+    old_c2ub = c2ub
     if len(common) > 1:
-        for i in range(len(common)):
-            x = common[i]
-            for y in common[i+1:]:
-                # print(denom_div)
-                if div_tab.peek_value(x,y) is None:
-                    val = 0
-                    # print(x,y,c1lb,c2lb, rel_c1, rel_c2)
-                    # subtracting the rel score from lb and ub, then multiplying them with the denominator for 
-                    # normalized div score to get the sum of diversity scores, then subtracting the value, after which 
-                    # dividing the newly obtained sum of div scores without val with the denominator - 1 (Accounting for the val being
-                    # removed) and then finally adding the rel score again to obtain the new lb without the common element
-                    # print("here",((c1lb - rel_c1)*denom_div - val),((c2lb - rel_c2)*denom_div - val))
-                    c1lb = (((c1lb - rel_c1)*denom_div - val)/(denom_div - 1)) + rel_c1
-                    c2lb = (((c2lb - rel_c2)*denom_div - val)/(denom_div - 1)) + rel_c2
-                    val = 10
-                    c1ub = (((c1ub - rel_c1)*denom_div - val)/(denom_div - 1)) + rel_c1
-                    c2ub = (((c2ub - rel_c2)*denom_div - val)/(denom_div - 1)) + rel_c2
+        # print(common)
+        for i in range(len(cand)):
+            x = cand[i]
+            for y in cand[i+1:]:
+                if x in common and y in common and div_tab.peek_value(x,y) is None:
+                    continue
+                
+                div_c1_lb += 0 if div_tab.peek_value(x,y) is None else div_tab.peek_value(x,y)*10
+                div_c1_ub += 10 if div_tab.peek_value(x,y) is None else div_tab.peek_value(x,y)*10
+                denom_c1 += 1
+                # print("Here3",(x,y), div_c1_lb, div_c1_ub, denom_c1)
+        c1lb = rel_c1 + div_c1_lb/denom_c1
+        c1ub = rel_c1 + div_c1_ub/denom_c1
+        for i in range(len(other)):
+            x = other[i]
+            for y in other[i+1:]:
+                if x in common and y in common and div_tab.peek_value(x,y) is None:
+                    continue
+                
+                div_c2_lb += 0 if div_tab.peek_value(x,y) is None else div_tab.peek_value(x,y)*10
+                div_c2_ub += 10 if div_tab.peek_value(x,y) is None else div_tab.peek_value(x,y)*10
+                denom_c2 += 1
+                # print("Here4",(x,y), div_c2_lb, div_c2_ub, denom_c2)
+        c2lb = rel_c2 + div_c2_lb/denom_c2
+        c2ub = rel_c2 + div_c2_ub/denom_c2
+        # if old_c1lb > c1lb or old_c1ub < c1ub: print(cand_bound, c1lb, c1ub)
+        # if old_c2lb > c2lb or old_c2ub < c2ub: print(other_bound, c2lb, c2ub)
+        # for i in range(len(common)):
+        #     x = common[i]
+        #     for y in common[i+1:]:
+        #         # print(denom_div)
+        #         if div_tab.peek_value(x,y) is None:
+        #             val = 0
+        #             # print(x,y,c1lb,c2lb, rel_c1, rel_c2)
+        #             # subtracting the rel score from lb and ub, then multiplying them with the denominator for 
+        #             # normalized div score to get the sum of diversity scores, then subtracting the value, after which 
+        #             # dividing the newly obtained sum of div scores without val with the denominator - 1 (Accounting for the val being
+        #             # removed) and then finally adding the rel score again to obtain the new lb without the common element
+        #             # print("here",((c1lb - rel_c1)*denom_div - val),((c2lb - rel_c2)*denom_div - val))
+        #             c1lb = (((c1lb - rel_c1)*denom_div - val)/(denom_div - 1)) + rel_c1
+        #             c2lb = (((c2lb - rel_c2)*denom_div - val)/(denom_div - 1)) + rel_c2
+        #             val = 10
+        #             c1ub = (((c1ub - rel_c1)*denom_div - val)/(denom_div - 1)) + rel_c1
+        #             c2ub = (((c2ub - rel_c2)*denom_div - val)/(denom_div - 1)) + rel_c2
+        #             # if c1lb > c1ub or c2lb > c2ub:
+        #             #     print(cand, other, cand_bound, other_bound, c1lb, c1ub, c2lb, c2ub ,rel_c1, rel_c2)
+        #             if other == (1,2,3,5,8):
+        #                 print(other_bound, c2lb, c2ub, denom_div, rel_c2)
+        #             # if cand == (1,2,3,5,7):
+        #             #     print(cand_bound, c1lb, c1ub, denom_div, rel_c2)
+        #             denom_div = denom_div -1
                 # else:
                 #     val = div_tab.peek_value(x,y)
                 #     print(x,y,val)
@@ -387,17 +253,46 @@ def common_ele(cand, cand_bound, other, other_bound, div_tab:Metric, rel_tab:Met
                 #     c2lb = (((c2lb - rel_c2)*denom_div - val)/(denom_div - 1)) + rel_c2
                 #     c1ub = (((c1ub - rel_c1)*denom_div - val)/(denom_div - 1)) + rel_c1
                 #     c2ub = (((c2ub - rel_c2)*denom_div - val)/(denom_div - 1)) + rel_c2
-                denom_div = denom_div -1
+                
+    if math.ceil(c1lb) == math.ceil(c1ub): # say when c1lb is 9.1 and c1ub is 9.2, both their ceils are 10, so i cannot take the floor of ub in this case
+        # print("Here")
+        c1lb = math.ceil(c1lb)
+        c1ub = math.ceil(c1ub)
+    # elif 1 > c1lb - c1ub > 0:
+    #     c1lb = math.floor(c1lb)
+    #     c1ub = math.ceil(c1ub)
+    else:
+        c1lb = math.ceil(c1lb)
+        c1ub = math.floor(c1ub)
+    if math.ceil(c2lb) == math.ceil(c2ub):
+        # print("Here2")
+        c2lb = math.ceil(c2lb)
+        c2ub = math.ceil(c2ub)
+    # elif 1 > c2lb - c2ub > 0:
+    #     c2lb = math.floor(c2lb)
+    #     c2ub = math.ceil(c2ub)
+    else:
+        c2lb = math.ceil(c2lb)
+        c2ub = math.floor(c2ub)
     new_c1bnd = (c1lb, c1ub)
     new_c2bnd = (c2lb, c2ub)
-    # print(cand_bound, other_bound, new_c1bnd, new_c2bnd)
+    
+    # if c1lb > c1ub or c2lb > c2ub:
+    # print("Here1",cand, other, cand_bound, other_bound, new_c1bnd, new_c2bnd,rel_c1, rel_c2)
+    if (cand_bound[0] > new_c1bnd[0] or cand_bound[1] < new_c1bnd[1] or other_bound[0] > new_c2bnd[0] or other_bound[1] < new_c2bnd[1]):
+        print("Here2",cand, other, cand_bound, other_bound, new_c1bnd, new_c2bnd, rel_c1, rel_c2)
+    # if cand == (0,1,2):
+    #     if other == (0,1,4) or other == (0,2,4) or other == (1,2,4):
+    #         print(cand_bound, other_bound, new_c1bnd, new_c2bnd,rel_c1, rel_c2)
     return new_c1bnd, new_c2bnd
 
 def gen_1d(candidates_set:dict):
     oned_table = {}
     for cand, bound in candidates_set.items():
         lb, ub = bound
-        lb, ub = int(lb*10), int(ub*10)
+        # print(lb,ub, np.round(lb, 1), np.round(ub,1))
+        lb, ub = math.floor(lb*10), math.ceil(ub*10)
+        # print(lb,ub)
         oned_table[cand] = [i for i in range(lb, ub+1)]
     # print(oned_table)
     return oned_table
@@ -409,25 +304,22 @@ def scoring_func2(cand, all_tables: dict, diversity_table:Metric,relevance_table
             req_table = table_names
             req_table_vals = all_tables[table_names]
             break
-    # flag = 1
-    # if cand == req_table[0]:
-    #     num = [vals[:-1] for vals in req_table_vals if 1 in vals]
-    # else:
-    #     num = [vals[:-1] for vals in req_table_vals if 0 in vals]
-    #     flag = 2
-    # signals = {bin(i): num[i] for i in range(len(num))}
     signals = {bin(i): req_table_vals[i] for i in range(len(req_table_vals))}
     # print(signals)
     source_node = {vals:[keys] for keys, vals in signals.items()}
-    denom = len(req_table_vals)
-    numer = 1
+    # numer = 1
+    prob = 1
     cand_bound = (min(req_table_vals), max(req_table_vals))
+    # denom = len(req_table_vals)
+    current_internode_access_count = 1
+    next_inter_node_access_count = 1
     for table_n, table_v in all_tables.items():
         if table_n == req_table: continue
         inter_node = {}
         signal_counter = {}
         # print(source_node.keys())
         other_bound = (min(table_v), max(table_v))
+        # print(cand_bound, other_bound)
         cand_bound_new, other_bound_new = common_ele(cand, cand_bound, table_n, other_bound, diversity_table, relevance_table)
         for sigs in source_node.values():  # Iterating through all the nodes and taking the list of signals in them
             # print(len(sigs))
@@ -439,55 +331,54 @@ def scoring_func2(cand, all_tables: dict, diversity_table:Metric,relevance_table
                             signal_counter[sig] = signal_counter.get(sig, 0) + 1
                             # print("here")
                     if signals[sig] >= vals: # if feasible signal, i.e., signal value is higher than the node value
-                        # print(sig, signals[sig][0], vals[:-1])
-                        # print(signals[sig], vals)
                         if vals not in inter_node: inter_node[vals] = [sig]  # then the signal enters that node
                         else: 
                             if sig not in inter_node[vals]: inter_node[vals].append(sig)
-                    # if flag == 2 and signals[sig][1] >= max(vals[:-1]): # flag == 1 or 2 decides which col of the 2d table to consider as the candidate
-                    #     # print(sig, signals[sig][1], vals[:-1])
-                    #     signal_counter[sig] = signal_counter.get(sig, 0) + 1
-                    #     if vals not in inter_node: inter_node[vals[:-1]] = [sig]
-                    #     else: inter_node[vals[:-1]].append(sig)
         source_node = inter_node  # the next node becomes the source node for the next table of nodes
-        
+        next_inter_node_access_count = len(inter_node.keys())
         if len(source_node) == 0: return 0 # if at any point, no source node is there then end the iteration. Can happen for 0 probability of winning
         # print(signal_counter)
         numer = sum(signal_counter.values())
         # print(cand, numer, denom)
         if numer == 0: return 0
-        
-        denom = denom * len(table_v)
-        # print(cand, numer, denom)
-    return numer/denom
+        # print(cand_bound_new, other_bound_new)
+        denom = (cand_bound_new[1] - cand_bound_new[0]+1) * current_internode_access_count * (other_bound_new[1] - other_bound_new[0]+1) 
+        # if cand == (0,1,2):
+        #     if table_n == (0,1,4) or table_n == (0,2,4) or table_n == (1,2,4):
+        #         print(cand, numer, denom, table_n)
+        current_internode_access_count = next_inter_node_access_count
+        # print(numer, denom)
+        prob *=  numer/denom
+        prob = prob
+    return prob
 
 def call_entropy_discrete_2D(candidates_set:dict, diversity_table:Metric,relevance_table:Metric, algorithm=None):
     if algorithm == NAIVE or algorithm == EXACT_BASELINE:
-        return 0
+        return 0, None
     if len(candidates_set) == 1:
-        return 0  # When only 1 candidate is left, it is clearly the winner now so entropy becomes 0 automatically
+        return 0, None  # When only 1 candidate is left, it is clearly the winner now so entropy becomes 0 automatically
     probabilities_candidate = {}
     # print(candidates_set)
     all_1d = gen_1d(candidates_set)
-    # pairs = list(candidates_set.items())
-    # grouped_pairs = [pairs[i:i+2] for i in range(0, len(pairs), 2)]
-    # # print(grouped_pairs)
-    # all_2d = gen_2d(grouped_pairs) 
-    # print(all_2d)
+    # print(all_1d)
     ckeys = list(candidates_set.keys())
     for cand in ckeys:
         prob_score = scoring_func2(cand, all_1d, diversity_table,relevance_table)
         probabilities_candidate[cand] = prob_score
-    normaliser = sum(probabilities_candidate.values())
-    probabilities_candidate = {key:vals/normaliser for key,vals in probabilities_candidate.items()}
-    entropy = -sum(map(lambda p: 0 if p==0 else p * math.log2(p), probabilities_candidate.values()))
     # print(probabilities_candidate)
+    normaliser = sum(probabilities_candidate.values())
+    # print(normaliser)
+    probabilities_candidate = {key:vals/normaliser for key,vals in probabilities_candidate.items()}
+    # print(probabilities_candidate)
+    entropy = -sum(map(lambda p: 0 if p==0.0 else p * math.log2(p), probabilities_candidate.values()))
+    entropy = 0.0 if entropy == -0.0 else entropy
+    # print(round(entropy, 4),probabilities_candidate)
     # print(candidates_set, entropy)
-    return round(entropy, 4)
+    return round(entropy, 3), probabilities_candidate
 
-def find_top_k_lowest_overlap(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None):
+def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None):
     # init candidates set and tables
-    algorithm = LOWEST_OVERLAP
+    algorithm = MAX_PROB
     n = len(documents)
     start_time_init_candidates_set = time.time()
     total_time_update_bounds = 0
@@ -503,26 +394,30 @@ def find_top_k_lowest_overlap(input_query, documents, k, metrics, mocked_tables 
     # entropy_over_time.append(call_entropy(candidates_set))
     # entropy_dep_over_time.append(call_entropy_dependence(candidates_set))
     # use all relevance llm calls
+    print(mocked_tables[0])
     candidates_set, _ = call_all_llms_relevance(input_query, documents, relevance_table, candidates_set, k, mocked_tables[0] if mocked_tables is not None else None, relevance_definition=relevance_definition)
 
     # algorithm
     count = n
+    determined_qs = []
+    its = 1
+    # print(candidates_set)
     while len(candidates_set) > 1:
         # entropy = call_entropy(candidates_set)
         start_time_compute_pdf = time.time()
-        entropy_dep = call_entropy_discrete_2D(candidates_set,diversity_table,relevance_table)
+        entropy_dep, probabilities_cand = call_entropy_discrete_2D(candidates_set,diversity_table,relevance_table)
         total_time_compute_pdf += time.time() - start_time_compute_pdf
         # print(f"Entropy at iteration {count}: ",entropy)
-        print(f"Entropy (dep) at iteration {count}: ",entropy_dep)
+        print(f"Entropy (dep) at iteration {its}: ",entropy_dep)
         # entropy_over_time.append(entropy)
         entropy_discrete_2D.append(entropy_dep)
         start_time_determine_next_question = time.time()
-        pair = choose_next_llm_diversity_lowest_overlap(diversity_table, candidates_set)
+        pair = choose_next_llm_diversity_max_prob(diversity_table, candidates_set, probabilities_cand, determined_qs)
         total_time_determine_next_question += time.time() - start_time_determine_next_question
         if pair is not None: i, j = pair
         else: break 
         start_time_llm_response = time.time()
-        value = call_llm_diversity(i, j, documents, mocked_tables[1] if mocked_tables is not None else None, diversity_definition=diversity_definition)
+        value = call_llm_diversity(i, j, documents, diversity_table=mocked_tables[1] if mocked_tables is not None else None, diversity_definition=diversity_definition)
         total_time_llm_response += time.time() - start_time_llm_response
         count += 1
         diversity_table.set(i, j, value)
@@ -530,72 +425,18 @@ def find_top_k_lowest_overlap(input_query, documents, k, metrics, mocked_tables 
         candidates_set, updated_candidates = update_lb_ub_diversity(candidates_set, (i, j), value, k)
         total_time_update_bounds += time.time() - start_time_update_bounds
         candidates_set = prune(candidates_set, updated_candidates)
+        its+=1
 
     # entropy_over_time.append(call_entropy(candidates_set))
-    entropy_discrete_2D.append(call_entropy_discrete_2D(candidates_set,diversity_table,relevance_table))
+    entropy_dep, probabilities_cand = call_entropy_discrete_2D(candidates_set,diversity_table,relevance_table)
+    entropy_discrete_2D.append(entropy_dep)
     print("*************************************")
-    print("Result - Lowest Overlap: \n", candidates_set)
+    print("Result - Max probability: \n", candidates_set)
     print("Total number of calls: " , count)
     # print("Final entropy: ", entropy_over_time[-1])
     componentsTime = ComponentsTime(total_time_init_candidates_set=total_time_init_candidates_set, total_time_update_bounds=total_time_update_bounds, total_time_compute_pdf=total_time_compute_pdf, total_time_determine_next_question=total_time_determine_next_question, total_time_llm_response=total_time_llm_response)
     return TopKResult(algorithm, candidates_set, componentsTime, count, entropy_discrete_2D) 
 
-
-def find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None):
-    # init candidates set and tables
-    algorithm = MIN_UNCERTAINTY
-    start_time = time.time()
-    n = len(documents)
-    start_time_init_candidates_set = time.time()
-    total_time_update_bounds = 0
-    total_time_determine_next_question = 0
-    total_time_llm_response = 0
-    total_time_compute_pdf = 0
-    candidates_set = init_candidates_set(n, k, 0, len(metrics))
-    total_time_init_candidates_set = time.time() - start_time_init_candidates_set
-    relevance_table = Metric(metrics[0], 1 ,n)
-    diversity_table = Metric(metrics[1], n ,n)
-    entropy_over_time = []
-    entropy_discrete_2D = []
-    # entropy_over_time.append(call_entropy(candidates_set))
-    # entropy_dep_over_time.append(call_entropy_dependence(candidates_set))
-    # use all relevance llm calls
-    candidates_set, _ = call_all_llms_relevance(input_query, documents, relevance_table, candidates_set, k, mocked_tables[0] if mocked_tables is not None else None, relevance_definition=relevance_definition)
-    
-    # algorithm
-    count = n
-    while len(candidates_set) > 1:
-        # entropy = call_entropy(candidates_set)
-        start_time_compute_pdf = time.time()
-        entropy_dep = call_entropy_discrete_2D(candidates_set,diversity_table,relevance_table)
-        total_time_compute_pdf += time.time() - start_time_compute_pdf
-        # print(f"Entropy at iteration {count}: ",entropy)
-        print(f"Entropy (dep) at iteration {count}: ",entropy_dep)
-        # entropy_over_time.append(entropy)
-        entropy_discrete_2D.append(entropy_dep)
-        start_time_determine_next_question = time.time()
-        pair = choose_next_llm_diversity(diversity_table, candidates_set)
-        total_time_determine_next_question += time.time() - start_time_determine_next_question
-        if pair is not None: i, j = pair
-        else: break 
-        start_time_llm_response = time.time()
-        value = call_llm_diversity(i, j, documents, mocked_tables[1] if mocked_tables is not None else None, diversity_definition=diversity_definition)
-        total_time_llm_response += time.time() - start_time_llm_response
-        count += 1
-        diversity_table.set(i, j, value)
-        start_time_update_bounds = time.time()
-        candidates_set, updated_candidates = update_lb_ub_diversity(candidates_set, (i, j), value, k)
-        total_time_update_bounds += time.time() - start_time_update_bounds
-        candidates_set = prune(candidates_set, updated_candidates)
-        
-    # entropy_over_time.append(call_entropy(candidates_set))
-    entropy_discrete_2D.append(call_entropy_discrete_2D(candidates_set,diversity_table,relevance_table))
-    print("*************************************")
-    print("Result - Min Uncertainty: \n", candidates_set)
-    print("Total number of calls: " , count)
-    # print("Final entropy: ", entropy_over_time[-1])
-    componentsTime = ComponentsTime(total_time_init_candidates_set=total_time_init_candidates_set, total_time_update_bounds=total_time_update_bounds, total_time_compute_pdf=total_time_compute_pdf, total_time_determine_next_question=total_time_determine_next_question, total_time_llm_response=total_time_llm_response)
-    return TopKResult(algorithm, candidates_set, componentsTime, count, entropy_discrete_2D) 
 
 def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None, dataset_name = None):
     # init candidate set and tables
@@ -636,12 +477,15 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, r
     algorithm = NAIVE
     start_time = time.time()
     n = len(documents)
+    count = n
+    print(n, choose_2(n))
     candidates_set = init_candidates_set(n, k, 0, len(metrics))
     # entropy_over_time.append(call_entropy(candidates_set))
     # entropy_dep_over_time.append(call_entropy_discrete_2D(candidates_set))
     mock_tables = mocked_tables is not None
     relevance_table = Metric(metrics[0], 1 ,n, dataset_name)
     diversity_table = Metric(metrics[1], n ,n, dataset_name)
+    diversity_table2 = Metric(metrics[1], n ,n, dataset_name)
     if mock_tables:
         relevance_table.set_all(mocked_tables[0])
         diversity_table.set_all(mocked_tables[1])
@@ -649,125 +493,104 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, r
         relevance_table.call_all(documents, input_query, relevance_definition=relevance_definition)
         diversity_table.call_all(documents, diversity_definition=diversity_definition)
     
-    for d in range(relevance_table.m):
-        # update bounds
-        value = relevance_table.table[0][d]
-        candidates_set, updated_keys = update_lb_ub_relevance(candidates_set, d, value, k)
+    # for d in range(relevance_table.m):
+    #     # update bounds
+    #     value = relevance_table.table[0][d]
+    #     candidates_set, updated_keys = update_lb_ub_relevance(candidates_set, d, value, k)
+    #     # prune
+    #     candidates_set = prune(candidates_set, updated_keys)
+    #     # entropy_over_time.append(call_entropy(candidates_set))
+    #     # entropy_dep_over_time.append(call_entropy_discrete_2D(candidates_set))
+    #     # print(entropy_over_time[-1])
+    already_qsd = []
+    candidates_set, _ = call_all_llms_relevance(input_query, documents, relevance_table, candidates_set, k, mocked_tables[0] if mocked_tables is not None else None, relevance_definition=relevance_definition)
+    # print(candidates_set)
+    entropy, _ = call_entropy_discrete_2D(candidates_set,diversity_table2,relevance_table)
+    entropy_dep_over_time.append(entropy)
+    while(len(candidates_set) > 1):
+        # print(candidates_set)
+        setofdocs = set()
+        for cand in candidates_set.keys():
+            for docs in cand:
+                setofdocs.add(docs)
+        i, j = choose_random_qs(setofdocs, already_qsd)
+        pair = (i,j)
+        value = diversity_table.table[i][j]
+        # print(already_qsd)
+        diversity_table2.set(i, j, value)
+        count += 1
+        candidates_set, updated_keys = update_lb_ub_diversity(candidates_set, pair, value, k)
         # prune
         candidates_set = prune(candidates_set, updated_keys)
         # entropy_over_time.append(call_entropy(candidates_set))
-        # entropy_dep_over_time.append(call_entropy_discrete_2D(candidates_set))
-        # print(entropy_over_time[-1])
+        entropy, _ = call_entropy_discrete_2D(candidates_set,diversity_table2,relevance_table)
+        entropy_dep_over_time.append(entropy)
+        # print(candidates_set, entropy_dep_over_time[-1])
 
-    for i in range(diversity_table.n):
-        for j in range(i + 1, diversity_table.m):
-            # update bounds
-            pair = (i, j)
-            value = diversity_table.table[i][j]
-            candidates_set, updated_keys = update_lb_ub_diversity(candidates_set, pair, value, k)
-            # prune
-            candidates_set = prune(candidates_set, updated_keys)
-            # entropy_over_time.append(call_entropy(candidates_set))
-            entropy_dep_over_time.append(call_entropy_discrete_2D(candidates_set,diversity_table,relevance_table))
-            # print(entropy_over_time[-1])
-    
-    # entropy_over_time.append(call_entropy(candidates_set, algorithm))
-    entropy_dep_over_time.append(call_entropy_discrete_2D(candidates_set,diversity_table,relevance_table, algorithm))
     print("The best candidate - Naive approach: \n", candidates_set)
     # print("Final entropy: ",entropy_over_time[-1])
     total_time=time.time() - start_time
     duration = ComponentsTime(total_time=total_time)
-    return TopKResult(algorithm, candidates_set, duration, choose_2(n), entropy_dep_over_time)
+    return TopKResult(algorithm, candidates_set, duration, count, entropy_dep_over_time)
 
-def choose_next_llm_diversity(diversity_table, candidates_set):
-    pair_uncertainty_scores = {}
+def choose_random_qs(setofdocs, already_qsd):
+    setofdocs = list(setofdocs)
+    temp = deepcopy(setofdocs)
+    i = np.random.choice(np.array(temp))
+    temp.remove(i)
+    j = np.random.choice(np.array(temp))
+    # print(i, j)
+    pair = (i,j)
+    while(i>=j or pair in already_qsd):
+        temp = deepcopy(setofdocs)
+        i = np.random.choice(np.array(temp))
+        temp.remove(i)
+        j = np.random.choice(np.array(temp))
+        pair = (i, j)
+        # print(i, j)
+    already_qsd.append(pair)
+    return i, j
 
-    for candidate, bounds in candidates_set.items():
-        candidate_pairs = list(itertools.combinations(candidate, 2))
-        for pair in candidate_pairs:
-            i, j = pair
-            # Only consider pairs with a None value in the diversity table
-            if diversity_table.table[i, j] is None:
-                shared_interval_sum = 0
-                for other_candidate, other_bounds in candidates_set.items(): 
-                    if other_candidate == candidate: continue
-                    lower_bound_shared = max(bounds[0], other_bounds[0])
-                    upper_bound_shared = min(bounds[1], other_bounds[1])
-                    if lower_bound_shared < upper_bound_shared:  # There is a common interval
-                        shared_interval_sum += (upper_bound_shared - lower_bound_shared)
-
-                if pair in pair_uncertainty_scores:
-                    pair_uncertainty_scores[pair] += shared_interval_sum
-                else:
-                    pair_uncertainty_scores[pair] = shared_interval_sum
-
-    # Find the pair with the maximum uncertainty score
-    if pair_uncertainty_scores:
-        max_pair = max(pair_uncertainty_scores, key=pair_uncertainty_scores.get)
-        return max_pair
-    else:   
-        return None  # In case no valid pair is found
-
-def choose_next_llm_diversity_lowest_overlap(diversity_table, candidates_set):
-    lbs, ubs, cands = [], [], []
-    mock_set = deepcopy(candidates_set)
-    for candidates in candidates_set.keys():
-        candidate_pairs = list(itertools.combinations(candidates, 2))
-        unfilled = 0
-        for pair in candidate_pairs:
-            i,j = pair
-            if diversity_table.table[i, j] is None:
-                unfilled = 1
-                break
-        if unfilled == 0: mock_set.pop(candidates) # Popping candidates where all possible tuples are already filled
-    for cand, bound in mock_set.items():
-        lbs.append(bound[0])
-        ubs.append(bound[1])
-        cands.append(cand)
-    bounds = (lbs[0], ubs[0])
-    lowest_overlap = 10000000
-    highest_non_overlap = 0
-    winner_cand = cands[0]
-    # runner_up = cands[1]
-    # print(winner_cand, runner_up)
-    for i in range(len(lbs)):
-        lb = lbs[i]
-        ub = ubs[i]
-        for r_ub in ubs:
-            if r_ub == ub: continue   # if other ub matches with cand's ub its a complete overlap so we can skip it
-            x = r_ub - lb   # Overlapping length
-            y = ub - r_ub   # Non-overlapping length
-            if x <= lowest_overlap and y >= highest_non_overlap:
-                lowest_overlap = x
-                highest_non_overlap = y
-                # runner_up = winner_cand
-                winner_cand = cands[i]
-                bounds = (lb, ub)
-                
-    pair_uncertainty_scores = {}
+def choose_next_llm_diversity_max_prob(diversity_table, candidates_set, probabilities_cand, determined_qs):       
+    # print(probabilities_cand)
+    winner_cand = max(probabilities_cand, key=probabilities_cand.get)     
     candidate_pairs = list(itertools.combinations(winner_cand, 2))
-    
-    # runner_up_pairs = list(itertools.combinations(runner_up, 2))
-    # print(f"candidate_pairs:{candidate_pairs}")
-    # req_pair = list(map(lambda x: x if x in runner_up_pairs else None, candidate_pairs))
-    # req_pair = list(filter(lambda x: x is not None, req_pair))
-    # print(req_pair)
-    # if req_pair: return req_pair[0]     #returns the document pair that is in 2nd potential winner
-    for pair in candidate_pairs:        #uses heuristic 1 if there is no common document tuple between winner and runner-up
+    candidate_pairs_temp = deepcopy(candidate_pairs)
+    flag = False
+    winner_cand_og = winner_cand
+    while(flag == False):
+        for pair in candidate_pairs_temp:
+            if pair in determined_qs:
+                candidate_pairs.remove(pair)
+        if len(candidate_pairs) == 0:
+            probabilities_cand.pop(winner_cand)
+            winner_cand = max(probabilities_cand, key=probabilities_cand.get)     
+            candidate_pairs = list(itertools.combinations(winner_cand, 2))
+            candidate_pairs_temp = deepcopy(candidate_pairs)
+            flag = False
+        else: 
+            flag = True
+    # print(determined_qs)
+    if winner_cand != winner_cand_og: print(winner_cand_og)
+    sorted_set = {k: v for k, v in sorted(candidates_set.items(), key=lambda x: (x[1][1], x[1][0]))}
+    print(sorted_set.popitem())
+    print(winner_cand, candidates_set[winner_cand], probabilities_cand[winner_cand], candidate_pairs)
+    pair_uncertainty_scores = {}
+    for pair in candidate_pairs:
         i,j = pair
-        if diversity_table.table[i, j] is None:
-            #Heuristic 1
-            shared_interval_sum = 0
-            for other_candidate, other_bounds in candidates_set.items(): 
-                if other_candidate == winner_cand: continue
-                lower_bound_shared = max(bounds[0], other_bounds[0])
-                upper_bound_shared = min(bounds[1], other_bounds[1])
-                if lower_bound_shared < upper_bound_shared:  # There is a common interval
-                    shared_interval_sum += (upper_bound_shared - lower_bound_shared)
-            pair_uncertainty_scores[pair] = pair_uncertainty_scores.get(pair, 0) + shared_interval_sum
+        p_cands_with_pair = 0
+        p_cands_without_pair = 0
+        for cand in probabilities_cand.keys():
+            if check_pair_exist(cand, pair):
+                p_cands_with_pair += probabilities_cand[cand]
+            else: p_cands_without_pair += probabilities_cand[cand]
+        pair_score = np.abs(p_cands_with_pair - p_cands_without_pair)
+        pair_uncertainty_scores[pair] = pair_score
     # Find the pair with the maximum uncertainty score
     if pair_uncertainty_scores:
         max_pair = max(pair_uncertainty_scores, key=pair_uncertainty_scores.get)
+        determined_qs.append(max_pair)
+        # print(max_pair, pair_uncertainty_scores)
         return max_pair
     else:   
         return None  # In case no valid pair is found
@@ -778,8 +601,8 @@ def update_lb_ub_relevance(candidates_set, d, value, k):
     for candidate in candidates_set:
         if d in candidate:
             updated_candidates.append(candidate)
-            new_lb = candidates_set[candidate][0] + (value / k)
-            new_ub = candidates_set[candidate][1] - ((1 - value) / k)
+            new_lb = np.round(candidates_set[candidate][0] + (value / k), 3)
+            new_ub = np.round(candidates_set[candidate][1] - ((1 - value) / k), 3)
             candidates_set[candidate] = (new_lb, new_ub)
 
     return candidates_set, updated_candidates
@@ -789,8 +612,9 @@ def update_lb_ub_diversity(candidates_set, pair, value, k):
     for candidate in candidates_set:
         if check_pair_exist(candidate, pair):
             updated_candidates.append(candidate)
-            new_lb = candidates_set[candidate][0] + (value / choose_2(k))
-            new_ub = candidates_set[candidate][1] - ((1 - value) / choose_2(k))
+            # print(candidate, candidates_set[candidate][0], candidates_set[candidate][1], value)
+            new_lb = np.round(candidates_set[candidate][0] + (value / choose_2(k)), 3)
+            new_ub = np.round(candidates_set[candidate][1] - ((1 - value) / choose_2(k)), 3)
             candidates_set[candidate] = (new_lb, new_ub)
 
     return candidates_set, updated_candidates
@@ -822,6 +646,7 @@ def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms
         mocked_tables = [relevance_table.table, diversity_table.table] if mock_llms else None 
         print(relevance_table)
         print(diversity_table)
+        # print(mocked_tables)
     
     if EXACT_BASELINE in methods:
         results.append(find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name))
@@ -829,11 +654,11 @@ def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms
     if NAIVE in methods:
         results.append(find_top_k_Naive(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name))
 
-    if MIN_UNCERTAINTY in methods:
-        results.append(find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition))
+    # if MIN_UNCERTAINTY in methods:
+        # results.append(find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition))
     
-    if LOWEST_OVERLAP in methods:
-        results.append(find_top_k_lowest_overlap(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition))
+    if MAX_PROB in methods:
+        results.append(find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition))
     
     return results
 
@@ -861,22 +686,23 @@ def store_results(results):
 
     print(f"Results have been stored in {filename}")
 
-# # # inputs
-# input_query = "I need a phone which is iPhone and has great storage"
-# relevance_definition = "Relevance"
-# diversity_definition = "Diversity"
-# input_path = "documents.txt"
-# dataset_name = "datasetname"
-# n = 5
-# k = 2
-# metrics = [RELEVANCE, DIVERSITY]
-# methods = [LOWEST_OVERLAP]
-# mock_llms = False
-# seed = 42
+# # inputs
+input_query = "I need a phone which is iPhone and has great storage"
+relevance_definition = "Relevance"
+diversity_definition = "Diversity"
+input_path = "documents.txt"
+dataset_name = "datasetname"
+n = 10
+k = 5
+metrics = [RELEVANCE, DIVERSITY]
+methods = [NAIVE, MAX_PROB]
+# methods = [NAIVE]
+mock_llms = True
+seed = 42
 
-# # run
-# documents = read_documents(input_path, n, mock_llms)
-# results = find_top_k(input_query, documents, k, metrics, methods, seed, mock_llms, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name)
+# run
+documents = read_documents(input_path, n, mock_llms)
+results = find_top_k(input_query, documents, k, metrics, methods, seed, mock_llms, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name)
 
-# # store results
-# store_results(results)
+# store results
+store_results(results)

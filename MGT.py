@@ -4,7 +4,7 @@ from utilities import RELEVANCE, DIVERSITY
 import time
 
 # Inputs for MGT
-experiments = [10000]  
+experiments = [4]  
 sequential_randomized_length = 16667
 #sequential_randomized_length = 16667
 dataset_name = "hotels"
