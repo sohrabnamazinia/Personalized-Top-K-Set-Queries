@@ -527,7 +527,7 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, r
         # entropy_over_time.append(call_entropy(candidates_set))
         entropy, _ = call_entropy_discrete_2D(candidates_set,diversity_table2,relevance_table)
         entropy_dep_over_time.append(entropy)
-        print(f"Entropy at iteration {its} for Naive approach:", entropy_dep_over_time[-1])
+        print(f"Entropy at iteration {its} for Naive approach: ", entropy_dep_over_time[-1])
 
     print("The best candidate - Naive approach: \n", candidates_set)
     # print("Final entropy: ",entropy_over_time[-1])
@@ -559,7 +559,7 @@ def choose_next_llm_diversity_max_prob(diversity_table, candidates_set, probabil
     candidate_pairs = list(itertools.combinations(winner_cand, 2))
     candidate_pairs_temp = deepcopy(candidate_pairs)
     flag = False
-    winner_cand_og = (winner_cand, probabilities_cand[winner_cand])
+    winner_cand_og = (winner_cand, probabilities_cand[winner_cand], candidates_set[winner_cand])
     while(flag == False):
         for pair in candidate_pairs_temp:
             if pair in determined_qs:
@@ -574,9 +574,9 @@ def choose_next_llm_diversity_max_prob(diversity_table, candidates_set, probabil
             flag = True
     # print(determined_qs)
     if winner_cand != winner_cand_og: print("Original winner:", winner_cand_og)
-    sorted_set = {k: v for k, v in sorted(candidates_set.items(), key=lambda x: (x[1][1], x[1][0]))}
-    print(sorted_set.popitem())
-    print(winner_cand, candidates_set[winner_cand], probabilities_cand[winner_cand], candidate_pairs)
+    # sorted_set = {k: v for k, v in sorted(candidates_set.items(), key=lambda x: (x[1][1], x[1][0]))}
+    # print(sorted_set.popitem())
+    print("Chosen winner: ", winner_cand, probabilities_cand[winner_cand], candidates_set[winner_cand], candidate_pairs)
     pair_uncertainty_scores = {}
     for pair in candidate_pairs:
         i,j = pair
