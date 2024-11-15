@@ -5,7 +5,7 @@ OPENAI_API_KEY.txt
 llm/
 dataset_hotelss/
 dataset_moviess/
-dataset_yelp/
+dataset_buisinessess/
 .venv/
 
 # ignore environ files
