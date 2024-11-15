@@ -71,6 +71,7 @@ class Metric:
                         if counter % 1000 == 0:
                             print("Rel call for document: " + str(d))
                         if counter % sequential_randomized_length == 0:
+                            print("Calling LLM for relevance of document: " + str(d))
                             start_time_rel = time.time()
                             # NOTE: IMAGE
                             value = call_llm_image(query, d, documents, relevance_definition=relevance_definition, images_directory=images_directory)
@@ -131,6 +132,7 @@ class Metric:
 
                 else:
                     for d in range(self.m):
+                        print("Calling LLM for relevance of document: " + str(d))
                         start_time_rel = time.time()
                         # NOTE: IMAGE
                         value = call_llm_image(query, d, documents, relevance_definition=relevance_definition, images_directory=images_directory)

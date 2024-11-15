@@ -4,19 +4,19 @@ from utilities import RELEVANCE, DIVERSITY
 import time
 
 # Inputs for MGT
-experiments = [4]  
-sequential_randomized_length_relevance = 2
-sequential_randomized_length_diversity = 2
+experiments = [10000]  
+sequential_randomized_length_relevance = 10
+sequential_randomized_length_diversity = 15000
 dataset_name = "businesses"
 input_query = "Affordable restaurant"
 relevance_definition = "Type_of_food"
 diversity_definition = "Open_hours"
 metrics = [RELEVANCE, DIVERSITY]
 images_directory = "dataset_businesses/businesses_photos/"
-#  dataset_name = "movies"
-#  input_query = "A scary movie"
-#  relevance_definition = "Popularity of the movie"
-#  diversity_definition = "Genre and movie periods"
+#  dataset_name = "businesses"
+#  input_query = "Affordable restaurant"
+#  relevance_definition = "Location_Around_New_York"
+#  diversity_definition = "Cost"
 
 for n in experiments:
     buisinesses_info, buisinesses_photos = read_data(n=n)

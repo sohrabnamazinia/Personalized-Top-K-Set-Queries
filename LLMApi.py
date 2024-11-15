@@ -23,7 +23,7 @@ class LLMApi:
         self.prompt_diversity = ChatPromptTemplate.from_template(LLMApi.prompt_diversity)
         self.relevance_definition = relevance_definition
         self.diversity_definition = diversity_definition
-        self.image_definition = image_relevance_definition
+        self.image_relevance_definition = image_relevance_definition
         self.is_output_discrete = is_output_discrete
         
     
@@ -49,7 +49,7 @@ class LLMApi:
         url = f'data:image/jpg;base64,{self.image_to_base64(img_path)}'
         self.prompt_img = ChatPromptTemplate.from_messages(
             messages=[
-                SystemMessage(content=f"The following query and image are about an item. Estimate the relevance of the query and the image as a floating point number in a scale of 0.0 to 1.0:\Query: {query}\n The definition of the relevance is fully user-defined as follows:{self.image_definition}"),
+                SystemMessage(content=f"The following query and image are about an item. Estimate the relevance of the query and the image as a floating point number in a scale of 0.0 to 1.0:\Query: {query}\n The definition of the relevance is fully user-defined as follows:{self.image_relevance_definition}"),
                 HumanMessagePromptTemplate.from_template(
                                 template=[
                         {"type": "image_url", "image_url": {"url": "{image_url}"}},
@@ -69,8 +69,8 @@ class LLMApi:
             encoded_string = base64.b64encode(image_file.read())
             return encoded_string.decode("utf-8")
 
-api = LLMApi(image_relevance_definition="cat should be wearing sunglass")
-result = api.call_llm_image("is there a cat?", "gratisography-cool-cat-800x525.jpg")
-print(result)
+# api = LLMApi(image_relevance_definition="cat should be wearing sunglass")
+# result = api.call_llm_image("is there a cat?", "gratisography-cool-cat-800x525.jpg")
+# print(result)
 
         
