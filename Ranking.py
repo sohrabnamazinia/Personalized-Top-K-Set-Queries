@@ -201,7 +201,7 @@ def call_llm_image(query, d, images, relevance_definition=None, relevance_table 
         return relevance_table[0][d]
     
     # Case: Real LLM - d is the string document
-    image_path = images_directory + images[d].photo_id
+    image_path = images_directory + str(images[d].photo_id)
     api = LLMApi(relevance_definition=relevance_definition)
     result = api.call_llm_image(query, image_path)
     return result
