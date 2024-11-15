@@ -12,7 +12,8 @@ def read_data(input_file="businesses.csv", n=1000):
         return []
 
     df = pd.read_csv(input_path, delimiter=',')
-    data_list = []
+    data_list_businesses_info = []
+    data_list_businesses_photos = []
 
     sampled_rows = df.sample(n=n, replace=True)
 
@@ -23,9 +24,11 @@ def read_data(input_file="businesses.csv", n=1000):
         
         photo_obj = BusinessPhoto(photo_id, photo_info)
         
-        data_list.append((business_info, photo_obj))
+        data_list_businesses_info.append(business_info)
+        data_list_businesses_photos.append(photo_obj)
 
-    return data_list
+    return (data_list_businesses_info, data_list_businesses_photos)
 
 # data = read_data(n=10000)  
-# print(len(data))
+# print(len(data[0]))
+# print(len(data[1]))

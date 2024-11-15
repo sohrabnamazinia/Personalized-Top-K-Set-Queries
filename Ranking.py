@@ -35,7 +35,7 @@ class Metric:
             mask = np.triu(np.ones((self.n, self.m)), k=1)
             self.table = np.where(mask, self.table, None)
     
-    def call_all_randomized_involved(self, documents, query=None, relevance_definition=None, diversity_definition=None, sequential_randomized_length = 16668):
+    def call_all_randomized_involved(self, documents, query=None, relevance_definition=None, diversity_definition=None, sequential_randomized_length = 16668, is_image_type=False, images_directory=None):
         mean = 0.57
         std_dev = 0.1
         values_choices = [i * 0.1 for i in range(11)]
@@ -47,24 +47,43 @@ class Metric:
                 writer = csv.writer(file)
                 writer.writerow(['d', 'value', 'time_rel'])
 
-                counter = 0
-                for d in range(self.m):
-                    if counter % 1000 == 0:
-                        print("Rel call for document: " + str(d))
-                    if counter % sequential_randomized_length == 0:
-                        start_time_rel = time.time()
-                        value = call_llm_relevance(query, d, documents, relevance_definition=relevance_definition)
-                        time_rel = time.time() - start_time_rel
-                        self.set(0, d, value)
-                        writer.writerow([d, value, time_rel])
-                    else:
-                        value = round(random.choice(values_choices), 1)
-                        time_rel = np.random.normal(mean, std_dev)
-                        time_rel = min(max(0.1, time_rel), 1.1)
-                        self.set(0, d, value)
-                        writer.writerow([d, value, time_rel])
-                    counter += 1
-                    
+                if not is_image_type:
+                    counter = 0
+                    for d in range(self.m):
+                        if counter % 1000 == 0:
+                            print("Rel call for document: " + str(d))
+                        if counter % sequential_randomized_length == 0:
+                            start_time_rel = time.time()
+                            value = call_llm_relevance(query, d, documents, relevance_definition=relevance_definition)
+                            time_rel = time.time() - start_time_rel
+                            self.set(0, d, value)
+                            writer.writerow([d, value, time_rel])
+                        else:
+                            value = round(random.choice(values_choices), 1)
+                            time_rel = np.random.normal(mean, std_dev)
+                            time_rel = min(max(0.1, time_rel), 1.1)
+                            self.set(0, d, value)
+                            writer.writerow([d, value, time_rel])
+                        counter += 1
+                else:
+                    counter = 0
+                    for d in range(self.m):
+                        if counter % 1000 == 0:
+                            print("Rel call for document: " + str(d))
+                        if counter % sequential_randomized_length == 0:
+                            start_time_rel = time.time()
+                            # NOTE: IMAGE
+                            value = call_llm_image(query, d, documents, relevance_definition=relevance_definition, images_directory=images_directory)
+                            time_rel = time.time() - start_time_rel
+                            self.set(0, d, value)
+                            writer.writerow([d, value, time_rel])
+                        else:
+                            value = round(random.choice(values_choices), 1)
+                            time_rel = np.random.normal(mean, std_dev)
+                            time_rel = min(max(0.1, time_rel), 1.1)
+                            self.set(0, d, value)
+                            writer.writerow([d, value, time_rel])
+                        counter += 1
 
         # Diversity table
         else:
@@ -94,7 +113,7 @@ class Metric:
                         counter += 1
 
     
-    def call_all(self, documents, query=None, relevance_definition=None, diversity_definition=None):
+    def call_all(self, documents, query=None, relevance_definition=None, diversity_definition=None, is_image_type = False, images_directory=None):
         # Relevance table
         if query is not None:
             relevance_csv = f"MGT_{self.dataset_name}_{self.m}_Rel_{relevance_definition}.csv"
@@ -102,12 +121,22 @@ class Metric:
                 writer = csv.writer(file)
                 writer.writerow(['d', 'value', 'time_rel'])
 
-                for d in range(self.m):
-                    start_time_rel = time.time()
-                    value = call_llm_relevance(query, d, documents, relevance_definition=relevance_definition)
-                    time_rel = time.time() - start_time_rel
-                    self.set(0, d, value)
-                    writer.writerow([d, value, time_rel])
+                if not is_image_type:
+                    for d in range(self.m):
+                        start_time_rel = time.time()
+                        value = call_llm_relevance(query, d, documents, relevance_definition=relevance_definition)
+                        time_rel = time.time() - start_time_rel
+                        self.set(0, d, value)
+                        writer.writerow([d, value, time_rel])
+
+                else:
+                    for d in range(self.m):
+                        start_time_rel = time.time()
+                        # NOTE: IMAGE
+                        value = call_llm_image(query, d, documents, relevance_definition=relevance_definition, images_directory=images_directory)
+                        time_rel = time.time() - start_time_rel
+                        self.set(0, d, value)
+                        writer.writerow([d, value, time_rel])
 
         # Diversity table
         else:
@@ -123,7 +152,6 @@ class Metric:
                         time_div = time.time() - start_time_div
                         self.set(d2, d1, value)
                         writer.writerow([d2, d1, value, time_div])
-    
 
 
     def peek_value(self, i, j=0):
@@ -163,6 +191,17 @@ def call_llm_diversity(d1, d2, documents, diversity_table = None, diversity_defi
     # Case: Real LLM - d is the string document
     api = LLMApi(diversity_definition=diversity_definition)
     result = api.call_llm_diversity(documents[d1], documents[d2])
+    return result
+
+def call_llm_image(query, d, images, relevance_definition=None, relevance_table = None, images_directory=None):
+    # Case: Mocked LLM - d is integer
+    if relevance_table is not None:
+        return relevance_table[0][d]
+    
+    # Case: Real LLM - d is the string document
+    image_path = images_directory + images[d].photo_id
+    api = LLMApi(relevance_definition=relevance_definition)
+    result = api.call_llm_image(query, image_path)
     return result
 
 def common_ele(cand, cand_bound, other, other_bound, div_tab:Metric, rel_tab:Metric):
@@ -688,23 +727,23 @@ def store_results(results):
 
     print(f"Results have been stored in {filename}")
 
-# # inputs
-input_query = "I need a phone which is iPhone and has great storage"
-relevance_definition = "Relevance"
-diversity_definition = "Diversity"
-input_path = "documents.txt"
-dataset_name = "datasetname"
-n = 10
-k = 3
-metrics = [RELEVANCE, DIVERSITY]
-methods = [NAIVE, MAX_PROB]
-# methods = [NAIVE]
-mock_llms = True
-seed = 42
+# # # inputs
+# input_query = "I need a phone which is iPhone and has great storage"
+# relevance_definition = "Relevance"
+# diversity_definition = "Diversity"
+# input_path = "documents.txt"
+# dataset_name = "datasetname"
+# n = 10
+# k = 3
+# metrics = [RELEVANCE, DIVERSITY]
+# methods = [NAIVE, MAX_PROB]
+# # methods = [NAIVE]
+# mock_llms = True
+# seed = 42
 
-# run
-documents = read_documents(input_path, n, mock_llms)
-results = find_top_k(input_query, documents, k, metrics, methods, seed, mock_llms, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name)
+# # run
+# documents = read_documents(input_path, n, mock_llms)
+# results = find_top_k(input_query, documents, k, metrics, methods, seed, mock_llms, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name)
 
-# store results
-store_results(results)
+# # store results
+# store_results(results)

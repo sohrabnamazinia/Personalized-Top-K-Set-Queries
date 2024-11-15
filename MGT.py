@@ -5,7 +5,7 @@ import time
 
 # Inputs for MGT
 experiments = [4]  
-sequential_randomized_length = 16667
+sequential_randomized_length = 2
 #sequential_randomized_length = 16667
 dataset_name = "hotels"
 input_query = "Affordable hotel"
