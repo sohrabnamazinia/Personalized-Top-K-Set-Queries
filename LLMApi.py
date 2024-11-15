@@ -46,7 +46,11 @@ class LLMApi:
         
     def call_llm_image(self, query, img_path):
         # Using a local path (converts image to a data URL)
-        url = f'data:image/jpg;base64,{self.image_to_base64(img_path)}'
+        try:
+            url = f'data:image/jpg;base64,{self.image_to_base64(img_path)}'
+        except FileNotFoundError:
+            print("This business does not have images")
+            return 0.0
         self.prompt_img = ChatPromptTemplate.from_messages(
             messages=[
                 SystemMessage(content=f"The following query and image are about an item. Estimate the relevance of the query and the image as a floating point number in a scale of 0.0 to 1.0:\Query: {query}\n The definition of the relevance is fully user-defined as follows:{self.image_relevance_definition}"),

@@ -1,13 +1,9 @@
-from PIL import Image
-import matplotlib.pyplot as plt
+import pandas as pd
 
-# Path to the image
-image_path = "dataset_businesses/businesses_photos/Ll5cXzRW1xGRsyFKhUSHrg.jpg"
+# Load the CSV file
+df = pd.read_csv('dataset_businesses/businesses.csv')
 
-# Open the image
-image = Image.open(image_path)
-
-# Display the image using matplotlib
-plt.imshow(image)
-plt.axis('off')  # Hide axes
-plt.show()
+# Iterate through rows and check for null in the 'photo_id' column
+for index, row in df.iterrows():
+    if pd.isnull(row['photo_id']):
+        print(f"Index: {index}, Business ID: {row['business_id']}")
