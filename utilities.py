@@ -13,6 +13,14 @@ class TopKResult:
         # self.entropy = entropy
         self.entropydep = entropydep
 
+class BusinessPhoto:
+    def __init__(self, photo_id, photo_info):
+        self.photo_id = photo_id
+        self.photo_info = photo_info
+
+    def __repr__(self):
+        return f"BusinessPhoto(photo_id={self.photo_id}, photo_info={self.photo_info})"
+
 class ComponentsTime:
     def __init__(self, total_time_init_candidates_set = None, total_time_update_bounds = None, total_time_compute_pdf = None, total_time_determine_next_question = None, total_time_llm_response = None, total_time=None) -> None:
         self.total_time_init_candidates_set = total_time_init_candidates_set
