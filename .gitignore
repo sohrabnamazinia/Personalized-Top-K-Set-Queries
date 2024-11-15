@@ -11,4 +11,4 @@ dataset_businesses/businesses_photos
 # ignore environ files
 .env
 
-.csv
+*.csv
