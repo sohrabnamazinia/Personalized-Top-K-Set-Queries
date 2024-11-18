@@ -1,17 +1,10 @@
 Experiment Results
 ==================
 
-Algorithm 1: Naive
------------------
-Candidates Set: {(0, 1, 7): (1.566, 1.567)}
-Execution Time: 55.1535 seconds
-API Calls: 49
-Entropy (dep) over time: [1.991, 1.995, 1.991, 1.992, 1.589, 0.055, 0.059, 0.069, 0.07, 0.087, 0.782, 0.0, 0.0, 0.0, 0.0, 0.0, 0.975, 0.991, 1.0, 1.0, 1.0, 1.0, 1.0, 0.03, 0.0, 0.0, 0.001, 0.001, 0.004, 0.028, 0.044, 0.407, 0.407, 0.407, 0.502, 0.533, 0.646, 0.848, 0.918, 0]
-
-Algorithm 2: Max_Prob
+Algorithm 1: Max_Prob
 --------------------
-Candidates Set: {(0, 1, 7): (1.566, 1.567)}
-Execution Time: 18.2951 seconds
-API Calls: 26
-Entropy (dep) over time: [1.991, 1.071, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.001, 0.003, 0.017, 0]
+Candidates Set: {(0, 1, 2): (0.899, 0.901)}
+Execution Time: 5.7976 seconds
+API Calls: 10
+Entropy (dep) over time: [1.86, 1.72, 1.41, 1.087, 1.191, 0.722, 0]
 

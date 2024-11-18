@@ -178,10 +178,10 @@ def call_all_llms_relevance(input_query, documents, relevance_table, candidates_
 
 def call_all_llms_relevance_MGT(dataset_name, relevance_table, candidates_set, k, relevance_definition=None):
     n = relevance_table.m
-    mgt_df = find_mgt_csv(dataset_name=dataset_name, n=n, relevance_definition=relevance_definition)
+    mgt_df_rel = find_mgt_csv(dataset_name=dataset_name, n=n, relevance_definition=relevance_definition)
     total_time_rel = 0
     for d in range(n):
-        row = mgt_df.iloc[d]  
+        row = mgt_df_rel.iloc[d]  
         value, time_rel = row['value'], row["time_rel"]
         total_time_rel += time_rel
         relevance_table.set(0, d, value)
@@ -209,9 +209,9 @@ def call_llm_diversity(d1, d2, documents, diversity_table = None, diversity_defi
     result = api.call_llm_diversity(documents[d1], documents[d2])
     return result
 
-def call_llm_diversity_MGT(d1, d2, mgt_df):
-    row_index = ((d1 * (d1 - 1)) / 2) + (d2 + 1)
-    row = mgt_df.iloc[row_index]
+def call_llm_diversity_MGT(d1, d2, mgt_df_div):
+    row_index = int(((d2 * (d2 - 1)) / 2) + (d1))
+    row = mgt_df_div.iloc[row_index]
     value = row['value']
     time_div = row['time_div']
 
@@ -461,8 +461,8 @@ def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None
     if not use_MGTs:
         candidates_set, _ = call_all_llms_relevance(input_query, documents, relevance_table, candidates_set, k, mocked_tables[0] if mocked_tables is not None else None, relevance_definition=relevance_definition)
     else:
-        mgt_df = find_mgt_csv(dataset_name=dataset_name, n=n, diversity_definition=diversity_definition)
-        candidates_set, _, total_time_llm_response_rel = call_all_llms_relevance_MGT(dataset_name=dataset_name, relevance_table=relevance_table, candidates_set=candidates_set, relevance_definition=relevance_definition)
+        mgt_df_div = find_mgt_csv(dataset_name=dataset_name, n=n, diversity_definition=diversity_definition)
+        candidates_set, _, total_time_llm_response_rel = call_all_llms_relevance_MGT(dataset_name=dataset_name, relevance_table=relevance_table, candidates_set=candidates_set, relevance_definition=relevance_definition, k=k)
         total_time_llm_response += total_time_llm_response_rel
     # algorithm
     count = n
@@ -470,6 +470,7 @@ def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None
     its = 1
     # print(candidates_set)
     while len(candidates_set) > 1:
+        print("Number of current candidates: " + str(len(candidates_set)))
         # entropy = call_entropy(candidates_set)
         start_time_compute_pdf = time.time()
         entropy_dep, probabilities_cand = call_entropy_discrete_2D(candidates_set,diversity_table,relevance_table)
@@ -488,7 +489,7 @@ def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None
             value = call_llm_diversity(i, j, documents, diversity_table=mocked_tables[1] if mocked_tables is not None else None, diversity_definition=diversity_definition)
             total_time_llm_response += time.time() - start_time_llm_response
         else:
-            value, time_div = call_llm_diversity_MGT(i, j, mgt_df)
+            value, time_div = call_llm_diversity_MGT(i, j, mgt_df_div)
             total_time_llm_response += time_div
         count += 1
         diversity_table.set(i, j, value)
@@ -765,7 +766,7 @@ relevance_definition = "Rating_of_the_hotel"
 diversity_definition = "Physical_distance_of_the_hotels"
 input_path = "documents.txt"
 dataset_name = "hotels"
-n = 4
+n = 16
 k = 3
 metrics = [RELEVANCE, DIVERSITY]
 methods = [MAX_PROB]
