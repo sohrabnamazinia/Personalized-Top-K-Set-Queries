@@ -1,5 +1,7 @@
 from enum import Enum
 import itertools
+import os
+import pandas as pd
 
 MAX_PROB, MIN_UNCERTAINTY, EXACT_BASELINE, NAIVE = "Max_Prob", "Min_Uncertainty", "Exact_Baseline", "Naive"
 RELEVANCE, DIVERSITY = "relevance", "diversity"
@@ -83,5 +85,21 @@ def check_prune(tuple_1, tuple_2):
     if bounds_2[0] >= bounds_1[1]: return candidate_1
     return None  
 
+def find_mgt_csv(dataset_name, n, relevance_definition=None, diversity_definition=None):
+    if diversity_definition == None:
+        mgt_file_name = f"MGT_{dataset_name}_{n}_Rel_{relevance_definition}.csv"
+    if relevance_definition == None:
+        mgt_file_name = f"MGT_{dataset_name}_{n}_Div_{diversity_definition}.csv"
+    current_dir = os.getcwd()
+    file_path = os.path.join(current_dir, "MGT_Results", mgt_file_name)
+
+    if os.path.isfile(file_path):
+        try:
+            df = pd.read_csv(file_path)
+            return df
+        except Exception as e:
+            raise RuntimeError(f"Error reading CSV file: {e}")
+    else:
+        raise FileNotFoundError(f"The file {mgt_file_name} was not found in the MGT_Results directory.")
 
 

@@ -6,7 +6,8 @@ from copy import deepcopy
 import math
 import csv
 import random
-from utilities import RELEVANCE, DIVERSITY, NAIVE, MIN_UNCERTAINTY, MAX_PROB, EXACT_BASELINE, TopKResult, ComponentsTime, read_documents, init_candidates_set, check_pair_exist, choose_2, compute_exact_scores_baseline, check_prune
+from utilities import RELEVANCE, DIVERSITY, NAIVE, MIN_UNCERTAINTY, MAX_PROB, EXACT_BASELINE, TopKResult, ComponentsTime, read_documents, init_candidates_set, check_pair_exist, choose_2, compute_exact_scores_baseline, check_prune, find_mgt_csv
+from read_data_hotels import read_data, merge_descriptions
 
 class Metric:
     def __init__(self, name: str, n: int, m: int, dataset_name = None):
@@ -175,6 +176,19 @@ def call_all_llms_relevance(input_query, documents, relevance_table, candidates_
         candidates_set, updated_candidates = update_lb_ub_relevance(candidates_set, d, value, k)
     return candidates_set, updated_candidates
 
+def call_all_llms_relevance_MGT(dataset_name, relevance_table, candidates_set, k, relevance_definition=None):
+    n = relevance_table.m
+    mgt_df = find_mgt_csv(dataset_name=dataset_name, n=n, relevance_definition=relevance_definition)
+    total_time_rel = 0
+    for d in range(n):
+        row = mgt_df.iloc[d]  
+        value, time_rel = row['value'], row["time_rel"]
+        total_time_rel += time_rel
+        relevance_table.set(0, d, value)
+        candidates_set, updated_candidates = update_lb_ub_relevance(candidates_set, d, value, k)
+    return candidates_set, updated_candidates, total_time_rel
+
+
 def call_llm_relevance(query, d, documents, relevance_definition=None, relevance_table = None):
     # Case: Mocked LLM - d is integer
     if relevance_table is not None:
@@ -194,6 +208,14 @@ def call_llm_diversity(d1, d2, documents, diversity_table = None, diversity_defi
     api = LLMApi(diversity_definition=diversity_definition)
     result = api.call_llm_diversity(documents[d1], documents[d2])
     return result
+
+def call_llm_diversity_MGT(d1, d2, mgt_df):
+    row_index = ((d1 * (d1 - 1)) / 2) + (d2 + 1)
+    row = mgt_df.iloc[row_index]
+    value = row['value']
+    time_div = row['time_div']
+
+    return value, time_div
 
 def call_llm_image(query, d, images, relevance_definition=None, relevance_table = None, images_directory=None):
     # Case: Mocked LLM - d is integer
@@ -417,7 +439,7 @@ def call_entropy_discrete_2D(candidates_set:dict, diversity_table:Metric,relevan
     # print(candidates_set, entropy)
     return round(entropy, 3), probabilities_candidate
 
-def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None):
+def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None, use_MGTs = False, dataset_name=None):
     # init candidates set and tables
     algorithm = MAX_PROB
     n = len(documents)
@@ -435,9 +457,13 @@ def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None
     # entropy_over_time.append(call_entropy(candidates_set))
     # entropy_dep_over_time.append(call_entropy_dependence(candidates_set))
     # use all relevance llm calls
-    print(mocked_tables[0])
-    candidates_set, _ = call_all_llms_relevance(input_query, documents, relevance_table, candidates_set, k, mocked_tables[0] if mocked_tables is not None else None, relevance_definition=relevance_definition)
-
+    #print(mocked_tables[0])
+    if not use_MGTs:
+        candidates_set, _ = call_all_llms_relevance(input_query, documents, relevance_table, candidates_set, k, mocked_tables[0] if mocked_tables is not None else None, relevance_definition=relevance_definition)
+    else:
+        mgt_df = find_mgt_csv(dataset_name=dataset_name, n=n, diversity_definition=diversity_definition)
+        candidates_set, _, total_time_llm_response_rel = call_all_llms_relevance_MGT(dataset_name=dataset_name, relevance_table=relevance_table, candidates_set=candidates_set, relevance_definition=relevance_definition)
+        total_time_llm_response += total_time_llm_response_rel
     # algorithm
     count = n
     determined_qs = []
@@ -457,9 +483,13 @@ def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None
         total_time_determine_next_question += time.time() - start_time_determine_next_question
         if pair is not None: i, j = pair
         else: break 
-        start_time_llm_response = time.time()
-        value = call_llm_diversity(i, j, documents, diversity_table=mocked_tables[1] if mocked_tables is not None else None, diversity_definition=diversity_definition)
-        total_time_llm_response += time.time() - start_time_llm_response
+        if not use_MGTs:
+            start_time_llm_response = time.time()
+            value = call_llm_diversity(i, j, documents, diversity_table=mocked_tables[1] if mocked_tables is not None else None, diversity_definition=diversity_definition)
+            total_time_llm_response += time.time() - start_time_llm_response
+        else:
+            value, time_div = call_llm_diversity_MGT(i, j, mgt_df)
+            total_time_llm_response += time_div
         count += 1
         diversity_table.set(i, j, value)
         start_time_update_bounds = time.time()
@@ -675,7 +705,7 @@ def prune(candidates_set, updated_keys):
             candidates_set.pop(key)
     return candidates_set
 
-def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms = False, is_output_discrete=True, relevance_definition = None, diversity_definition = None, dataset_name = None):
+def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms = False, is_output_discrete=True, relevance_definition = None, diversity_definition = None, dataset_name = None, use_MGTs = False):
     results = []
     mocked_tables = None
     n = len(documents)
@@ -701,7 +731,7 @@ def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms
         # results.append(find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition))
     
     if MAX_PROB in methods:
-        results.append(find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition))
+        results.append(find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs))
     
     return results
 
@@ -729,23 +759,24 @@ def store_results(results):
 
     print(f"Results have been stored in {filename}")
 
-# # # inputs
-# input_query = "I need a phone which is iPhone and has great storage"
-# relevance_definition = "Relevance"
-# diversity_definition = "Diversity"
-# input_path = "documents.txt"
-# dataset_name = "datasetname"
-# n = 10
-# k = 3
-# metrics = [RELEVANCE, DIVERSITY]
-# methods = [NAIVE, MAX_PROB]
-# # methods = [NAIVE]
-# mock_llms = True
-# seed = 42
+# # inputs
+input_query = "Affordable hotel"
+relevance_definition = "Rating_of_the_hotel"
+diversity_definition = "Physical_distance_of_the_hotels"
+input_path = "documents.txt"
+dataset_name = "hotels"
+n = 4
+k = 3
+metrics = [RELEVANCE, DIVERSITY]
+methods = [MAX_PROB]
+mock_llms = False
+use_MGTs = True
+seed = 42
 
-# # run
-# documents = read_documents(input_path, n, mock_llms)
-# results = find_top_k(input_query, documents, k, metrics, methods, seed, mock_llms, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name)
+# run
+#documents = read_documents(input_path, n, mock_llms)
+data = merge_descriptions(read_data(n=n))
+results = find_top_k(input_query=input_query, documents=data, k=k, metrics=metrics, methods=methods, seed=seed, mock_llms=mock_llms, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=True)
 
-# # store results
-# store_results(results)
+# store results
+store_results(results)

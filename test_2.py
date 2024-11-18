@@ -1,16 +1,25 @@
+import os
 import pandas as pd
 
-input_file = 'dataset_hotels/hotels_small.csv'
-output_file = 'dataset_hotels/hotels.csv'
+# Define the path to the directory containing the CSV files
+directory_path = '../../MGT Results/'
 
-chunk_size = 30_000
-
-try:
-    df = pd.read_csv(input_file, nrows=chunk_size, encoding='utf-8')
-except UnicodeDecodeError:
-    df = pd.read_csv(input_file, nrows=chunk_size, encoding='ISO-8859-1')
-
-
-df.to_csv(output_file, index=False)
-
-print(f"The first 100,000 rows have been saved to {output_file}")
+# Iterate through each file in the directory
+for filename in os.listdir(directory_path):
+    if filename.endswith('.csv'):
+        file_path = os.path.join(directory_path, filename)
+        
+        # Read the CSV file
+        try:
+            df = pd.read_csv(file_path)
+            print(f"\nHeaders and last row for file: {filename}")
+            
+            # Print headers
+            print("Headers:")
+            print(df.columns.tolist())
+            
+            # Print the last row
+            print("Last row:")
+            print(df.iloc[-1].to_dict())
+        except Exception as e:
+            print(f"Error reading {filename}: {e}")
