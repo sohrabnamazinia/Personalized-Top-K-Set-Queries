@@ -3,15 +3,15 @@ from read_data_movies import read_data, merge_plots
 from Ranking import find_top_k
 from utilities import RELEVANCE, DIVERSITY, NAIVE, MAX_PROB
 
-experiments = [(6, 3)] 
-dataset_name = "hotels"
-input_query = "A scary movie"
-relevance_definition = "Popularity of the movie"
-diversity_definition = "Genre and movie periods"
+experiments = [(5, 3)] 
+dataset_name = "businesses"
+input_query = "Affordable restaurant"
+relevance_definition = "Type_of_food"
+diversity_definition = "Open_hours"
 use_MGTs = True
 metrics = [RELEVANCE, DIVERSITY]
 methods = [MAX_PROB]  
-output_file = "experiment_movies.csv" 
+output_file = "experiment_businesses.csv" 
 
 with open(output_file, mode='w', newline='') as file:
     writer = csv.writer(file)
@@ -28,7 +28,7 @@ with open(output_file, mode='w', newline='') as file:
 
 for (n, k) in experiments:
     data = merge_plots(read_data(n=n))
-    results = find_top_k(input_query=input_query, documents=data, k=k, metrics=metrics, methods=methods, mock_llms=False, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs)
+    results = find_top_k(input_query, data, k, metrics, methods, mock_llms=False, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs)
     
     with open(output_file, mode='a', newline='') as file:
         writer = csv.writer(file)

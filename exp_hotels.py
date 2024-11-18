@@ -1,19 +1,19 @@
 import csv
 from read_data_hotels import read_data, merge_descriptions
 from Ranking import find_top_k
-from utilities import RELEVANCE, DIVERSITY, NAIVE, MIN_UNCERTAINTY, LOWEST_OVERLAP, EXACT_BASELINE
+from utilities import RELEVANCE, DIVERSITY, NAIVE, MAX_PROB
 
 # List of (n, k) tuples for experimentation
-experiments = [(4, 2)]  # Adjust as needed
+experiments = [(4, 2)]  
 dataset_name = "hotels"
 input_query = "Affordable hotel"
-relevance_definition = "Rating of the hotel"
-diversity_definition = "Physical distance of the hotel"
+relevance_definition = "Rating_of_the_hotel"
+diversity_definition = "Physical_distance_of_the_hotels"
 metrics = [RELEVANCE, DIVERSITY]
-methods = [EXACT_BASELINE, LOWEST_OVERLAP]  # Include all methods as needed
+use_MGTs = True
+methods = [MAX_PROB]  
 output_file = "experiment_hotels.csv"
 
-# Open CSV file and write the header for combined results
 with open(output_file, mode='w', newline='') as file:
     writer = csv.writer(file)
     writer.writerow([
@@ -24,14 +24,13 @@ with open(output_file, mode='w', newline='') as file:
         "total_time_determine_next_question", 
         "total_time_llm_response",
         "total_time", 
-        "api_calls"  # New column for cost (API calls)
+        "api_calls"  
     ])
 
 for (n, k) in experiments:
     data = merge_descriptions(read_data(n=n))
-    results = find_top_k(input_query, data, k, metrics, methods, mock_llms=False, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name)
-    
-    # Append each result's timing and cost details into the CSV
+    results = find_top_k(input_query=input_query, documents=data, k=k, metrics=metrics, methods=methods, mock_llms=False, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs)
+
     with open(output_file, mode='a', newline='') as file:
         writer = csv.writer(file)
         for result in results:
@@ -43,7 +42,7 @@ for (n, k) in experiments:
                 result.time.total_time_determine_next_question,
                 result.time.total_time_llm_response,
                 result.time.total_time,
-                result.api_calls  # Add cost as last column
+                result.api_calls  
             ])
 
 print("Experiment completed. Combined results saved in:", output_file)
