@@ -783,24 +783,24 @@ def store_results(results):
 
     print(f"Results have been stored in {filename}")
 
-# # inputs
-input_query = "Affordable hotel"
-relevance_definition = "Rating_of_the_hotel"
-diversity_definition = "Physical_distance_of_the_hotels"
-input_path = "documents.txt"
-dataset_name = "hotels"
-n = 100
-k = 3
-metrics = [RELEVANCE, DIVERSITY]
-methods = [MAX_PROB, NAIVE, EXACT_BASELINE]
-mock_llms = False
-use_MGTs = True
-seed = 42
+# # # inputs
+# input_query = "Affordable hotel"
+# relevance_definition = "Rating_of_the_hotel"
+# diversity_definition = "Physical_distance_of_the_hotels"
+# input_path = "documents.txt"
+# dataset_name = "hotels"
+# n = 100
+# k = 3
+# metrics = [RELEVANCE, DIVERSITY]
+# methods = [MAX_PROB, NAIVE, EXACT_BASELINE]
+# mock_llms = False
+# use_MGTs = True
+# seed = 42
 
-# run
-#documents = read_documents(input_path, n, mock_llms)
-data = merge_descriptions(read_data(n=n))
-results = find_top_k(input_query=input_query, documents=data, k=k, metrics=metrics, methods=methods, seed=seed, mock_llms=mock_llms, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=True)
+# # run
+# #documents = read_documents(input_path, n, mock_llms)
+# data = merge_descriptions(read_data(n=n))
+# results = find_top_k(input_query=input_query, documents=data, k=k, metrics=metrics, methods=methods, seed=seed, mock_llms=mock_llms, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=True)
 
-# store results
-store_results(results)
+# # store results
+# store_results(results)
