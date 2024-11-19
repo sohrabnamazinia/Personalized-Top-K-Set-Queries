@@ -26,7 +26,7 @@ def read_data(input_file="wiki_movie_plots_deduped.csv", n=1000):
         title = row['Title']
         if title not in unique_titles:
             unique_titles.add(title)
-        indices.append(index)
+            indices.append(index)
         if len(unique_titles) >= n:
             break
     

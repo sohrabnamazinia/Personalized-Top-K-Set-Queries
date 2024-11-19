@@ -25,7 +25,7 @@ def read_data(input_file="hotels.csv", n=1000):
         hotel_name = row['HotelName']
         if hotel_name not in unique_hotels:
             unique_hotels.add(hotel_name)
-        indices.append(index)
+            indices.append(index)
         if len(unique_hotels) >= n:
             break
     

@@ -91,8 +91,8 @@ def find_mgt_csv(dataset_name, n, relevance_definition=None, diversity_definitio
     if relevance_definition == None:
         mgt_file_name = f"MGT_{dataset_name}_{n}_Div_{diversity_definition}.csv"
     current_dir = os.getcwd()
-    file_path = os.path.join(current_dir, "MGT_Results", mgt_file_name)
-
+    # file_path = os.path.join(current_dir, "MGT_Results", mgt_file_name)
+    file_path = os.path.join(current_dir,  mgt_file_name)
     if os.path.isfile(file_path):
         try:
             df = pd.read_csv(file_path)
