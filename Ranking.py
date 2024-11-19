@@ -413,6 +413,7 @@ def scoring_func2(cand, all_tables: dict, diversity_table:Metric,relevance_table
         # print(numer, denom)
         prob *=  numer/denom
         prob = prob
+    
     return prob
 
 def call_entropy_discrete_2D(candidates_set:dict, diversity_table:Metric,relevance_table:Metric, algorithm=None):
@@ -425,9 +426,12 @@ def call_entropy_discrete_2D(candidates_set:dict, diversity_table:Metric,relevan
     all_1d = gen_1d(candidates_set)
     # print(all_1d)
     ckeys = list(candidates_set.keys())
+    counter = 0
     for cand in ckeys:
+        print("Computing probability for candidate number: " + str(counter))
         prob_score = scoring_func2(cand, all_1d, diversity_table,relevance_table)
         probabilities_candidate[cand] = prob_score
+        counter += 1
     # print(probabilities_candidate)
     normaliser = sum(probabilities_candidate.values())
     # print(normaliser)
@@ -470,13 +474,13 @@ def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None
     its = 1
     # print(candidates_set)
     while len(candidates_set) > 1:
-        print("Number of current candidates: " + str(len(candidates_set)))
+        print("Iteration: " + str(its) + ", No. Candidates: " + str(len(candidates_set)))
         # entropy = call_entropy(candidates_set)
         start_time_compute_pdf = time.time()
         entropy_dep, probabilities_cand = call_entropy_discrete_2D(candidates_set,diversity_table,relevance_table)
         total_time_compute_pdf += time.time() - start_time_compute_pdf
         # print(f"Entropy at iteration {count}: ",entropy)
-        print(f"Entropy (dep) at iteration {its}: ",entropy_dep)
+        #print(f"Entropy (dep) at iteration {its}: ",entropy_dep)
         # entropy_over_time.append(entropy)
         entropy_discrete_2D.append(entropy_dep)
         start_time_determine_next_question = time.time()

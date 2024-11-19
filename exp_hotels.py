@@ -4,7 +4,7 @@ from Ranking import find_top_k
 from utilities import RELEVANCE, DIVERSITY, NAIVE, MAX_PROB
 
 # List of (n, k) tuples for experimentation
-experiments = [(4, 2)]  
+experiments = [(32, 2)]  
 dataset_name = "hotels"
 input_query = "Affordable hotel"
 relevance_definition = "Rating_of_the_hotel"
