@@ -1,6 +1,6 @@
 import csv
 from read_data_movies import read_data, merge_plots
-from Ranking import find_top_k
+from Ranking import find_top_k, store_results
 from utilities import RELEVANCE, DIVERSITY, NAIVE, MAX_PROB
 
 experiments = [(5, 3)] 
@@ -25,11 +25,11 @@ with open(output_file, mode='w', newline='') as file:
         "total_time",
         "api_calls"  
     ])
-
+all_results = []
 for (n, k) in experiments:
     data = merge_plots(read_data(n=n))
     results = find_top_k(input_query, data, k, metrics, methods, mock_llms=False, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs)
-    
+    all_results.extend(results)
     with open(output_file, mode='a', newline='') as file:
         writer = csv.writer(file)
         for result in results:
@@ -44,4 +44,5 @@ for (n, k) in experiments:
                 result.api_calls  
             ])
 
+store_results(all_results, dataset_name=dataset_name)
 print("Experiment completed. Combined results saved in:", output_file)

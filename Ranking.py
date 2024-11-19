@@ -506,8 +506,8 @@ def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None
     # entropy_over_time.append(call_entropy(candidates_set))
     entropy_dep, probabilities_cand = call_entropy_discrete_2D(candidates_set,diversity_table,relevance_table)
     entropy_discrete_2D.append(entropy_dep)
-    print(relevance_table)
-    print(diversity_table)
+    #print(relevance_table)
+    #print(diversity_table)
     print("*************************************")
     print("Result - Max probability: \n", candidates_set)
     print("Total number of calls: " , count)
@@ -562,14 +562,14 @@ def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables 
     start_time_determine_winner = time.time()
     result = compute_exact_scores_baseline([relevance_table, diversity_table], candidates_set)
     total_time_determine_winner += time.time() - start_time_determine_winner
-    print("Baseline Approach - Exact scores:\n", result)
+    #print("Baseline Approach - Exact scores:\n", result)
     # print("Final entropy: ",entropy, entropy_dep)
     print("*****************************")
     total_time=time.time() - start_time
     duration = ComponentsTime(total_time=total_time)
     return TopKResult(algorithm, result, duration, choose_2(n) + n, entropy_dep)
 
-def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None, use_MGTs = False, dataset_name=None):
+def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None, use_MGTs = False, dataset_name=None, report_entropy=False):
     # init candidate set and tables
     entropy_over_time = []
     entropy_dep_over_time = []
@@ -577,7 +577,7 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, r
     start_time = time.time()
     n = len(documents)
     count = n
-    print(n, choose_2(n))
+    #print(n, choose_2(n))
     candidates_set = init_candidates_set(n, k, 0, len(metrics))
     # entropy_over_time.append(call_entropy(candidates_set))
     # entropy_dep_over_time.append(call_entropy_discrete_2D(candidates_set))
@@ -593,8 +593,9 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, r
         # total_time_llm_response += total_time_llm_response_rel    
     already_qsd = []
     # print(candidates_set)
-    entropy, _ = call_entropy_discrete_2D(candidates_set,diversity_table2,relevance_table)
-    entropy_dep_over_time.append(entropy)
+    if report_entropy:
+        entropy, _ = call_entropy_discrete_2D(candidates_set,diversity_table2,relevance_table)
+        entropy_dep_over_time.append(entropy)
     its = 0
     while(len(candidates_set) > 1):
         # print(candidates_set)
@@ -620,7 +621,7 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, r
         candidates_set = prune(candidates_set, updated_keys)
         entropy, _ = call_entropy_discrete_2D(candidates_set,diversity_table2,relevance_table)
         entropy_dep_over_time.append(entropy)
-        print(f"Entropy at iteration {its} for Naive approach: ", entropy_dep_over_time[-1])
+        #print(f"Entropy at iteration {its} for Naive approach: ", entropy_dep_over_time[-1])
 
     # print(relevance_table)
     # print(diversity_table2)
@@ -668,10 +669,10 @@ def choose_next_llm_diversity_max_prob(diversity_table, candidates_set, probabil
         else: 
             flag = True
     # print(determined_qs)
-    if winner_cand != winner_cand_og: print("Original winner:", winner_cand_og)
+    #if winner_cand != winner_cand_og: print("Original winner:", winner_cand_og)
     # sorted_set = {k: v for k, v in sorted(candidates_set.items(), key=lambda x: (x[1][1], x[1][0]))}
     # print(sorted_set.popitem())
-    print("Chosen winner: ", winner_cand, probabilities_cand[winner_cand], candidates_set[winner_cand], candidate_pairs)
+    #print("Chosen winner: ", winner_cand, probabilities_cand[winner_cand], candidates_set[winner_cand], candidate_pairs)
     pair_uncertainty_scores = {}
     for pair in candidate_pairs:
         i,j = pair
@@ -759,12 +760,14 @@ def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms
     
     return results
 
-def store_results(results):
-    filename = "results.txt"
+def store_results(results, dataset_name=None):
+    if dataset_name == None:
+        filename = "results.txt"
+    else:
+        filename = "restuls_" + dataset_name + ".txt"
     with open(filename, 'w') as file:
         file.write("Experiment Results\n")
         file.write("==================\n\n")
-
         for i, result in enumerate(results, 1):
             file.write(f"Algorithm {i}: {result.algorithm}\n")
             file.write("-" * (12 + len(result.algorithm)) + "\n")

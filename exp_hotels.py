@@ -1,18 +1,18 @@
 import csv
 from read_data_hotels import read_data, merge_descriptions
-from Ranking import find_top_k
-from utilities import RELEVANCE, DIVERSITY, NAIVE, MAX_PROB
+from Ranking import find_top_k, store_results
+from utilities import RELEVANCE, DIVERSITY, NAIVE, MAX_PROB, EXACT_BASELINE
 
-# List of (n, k) tuples for experimentation
-experiments = [(4, 2)]  
+# List of (n, k) tuples for experimentatio
+experiments = [(16, 2)]  
 dataset_name = "hotels"
 input_query = "Affordable hotel"
 relevance_definition = "Rating_of_the_hotel"
 diversity_definition = "Physical_distance_of_the_hotels"
 metrics = [RELEVANCE, DIVERSITY]
 use_MGTs = True
-methods = [MAX_PROB]  
-output_file = "experiment_hotels.csv"
+methods = [MAX_PROB, NAIVE, EXACT_BASELINE]  
+output_file = "results_hotels.csv"
 
 with open(output_file, mode='w', newline='') as file:
     writer = csv.writer(file)
@@ -26,11 +26,11 @@ with open(output_file, mode='w', newline='') as file:
         "total_time", 
         "api_calls"  
     ])
-
+all_results = []
 for (n, k) in experiments:
     data = merge_descriptions(read_data(n=n))
     results = find_top_k(input_query=input_query, documents=data, k=k, metrics=metrics, methods=methods, mock_llms=False, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs)
-
+    all_results.extend(results)
     with open(output_file, mode='a', newline='') as file:
         writer = csv.writer(file)
         for result in results:
@@ -44,5 +44,6 @@ for (n, k) in experiments:
                 result.time.total_time,
                 result.api_calls  
             ])
-
+store_results(all_results, dataset_name=dataset_name)
 print("Experiment completed. Combined results saved in:", output_file)
+print("Combined results saved in:", output_file)
