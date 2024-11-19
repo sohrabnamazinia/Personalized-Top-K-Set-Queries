@@ -619,8 +619,9 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, r
         candidates_set, updated_keys = update_lb_ub_diversity(candidates_set, pair, value, k)
         # prune
         candidates_set = prune(candidates_set, updated_keys)
-        entropy, _ = call_entropy_discrete_2D(candidates_set,diversity_table2,relevance_table)
-        entropy_dep_over_time.append(entropy)
+        if report_entropy:
+            entropy, _ = call_entropy_discrete_2D(candidates_set,diversity_table2,relevance_table)
+            entropy_dep_over_time.append(entropy)
         #print(f"Entropy at iteration {its} for Naive approach: ", entropy_dep_over_time[-1])
 
     # print(relevance_table)
@@ -730,7 +731,7 @@ def prune(candidates_set, updated_keys):
             candidates_set.pop(key)
     return candidates_set
 
-def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms = False, is_output_discrete=True, relevance_definition = None, diversity_definition = None, dataset_name = None, use_MGTs = False):
+def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms = False, is_output_discrete=True, relevance_definition = None, diversity_definition = None, dataset_name = None, use_MGTs = False, report_entropy_in_naive=False):
     results = []
     mocked_tables = None
     n = len(documents)
@@ -750,7 +751,7 @@ def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms
         results.append(find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs))
 
     if NAIVE in methods:
-        results.append(find_top_k_Naive(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs))
+        results.append(find_top_k_Naive(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs, report_entropy=report_entropy_in_naive))
 
     # if MIN_UNCERTAINTY in methods:
         # results.append(find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition))

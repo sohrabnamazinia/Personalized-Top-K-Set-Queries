@@ -10,5 +10,5 @@ dataset_businesses/businesses_photoss
 
 # ignore environ files
 .env
-
+MGT_Results/
 *.csv

@@ -6,6 +6,7 @@ from utilities import RELEVANCE, DIVERSITY, NAIVE, MAX_PROB
 experiments = [(6, 3)] 
 dataset_name = "movies"
 input_query = "A scary movie"
+report_entropy_in_naive = False
 relevance_definition = "Popularity of the movie"
 diversity_definition = "Genre and movie periods"
 use_MGTs = True
@@ -29,7 +30,7 @@ with open(output_file, mode='w', newline='') as file:
 all_results = []
 for (n, k) in experiments:
     data = merge_plots(read_data(n=n))
-    results = find_top_k(input_query=input_query, documents=data, k=k, metrics=metrics, methods=methods, mock_llms=False, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs)
+    results = find_top_k(input_query=input_query, documents=data, k=k, metrics=metrics, methods=methods, mock_llms=False, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs, report_entropy_in_naive=report_entropy_in_naive)
     all_results.extend(result)
     with open(output_file, mode='a', newline='') as file:
         writer = csv.writer(file)

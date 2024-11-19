@@ -4,13 +4,14 @@ from Ranking import find_top_k, store_results
 from utilities import RELEVANCE, DIVERSITY, NAIVE, MAX_PROB, EXACT_BASELINE
 
 # List of (n, k) tuples for experimentatio
-experiments = [(16, 2)]  
+experiments = [(4, 3)]  
 dataset_name = "hotels"
 input_query = "Affordable hotel"
 relevance_definition = "Rating_of_the_hotel"
 diversity_definition = "Physical_distance_of_the_hotels"
 metrics = [RELEVANCE, DIVERSITY]
 use_MGTs = True
+report_entropy_in_naive = 
 methods = [MAX_PROB, NAIVE, EXACT_BASELINE]  
 output_file = "results_hotels.csv"
 
@@ -29,7 +30,7 @@ with open(output_file, mode='w', newline='') as file:
 all_results = []
 for (n, k) in experiments:
     data = merge_descriptions(read_data(n=n))
-    results = find_top_k(input_query=input_query, documents=data, k=k, metrics=metrics, methods=methods, mock_llms=False, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs)
+    results = find_top_k(input_query=input_query, documents=data, k=k, metrics=metrics, methods=methods, mock_llms=False, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs, report_entropy_in_naive=report_entropy_in_naive)
     all_results.extend(results)
     with open(output_file, mode='a', newline='') as file:
         writer = csv.writer(file)
