@@ -4,14 +4,14 @@ from Ranking import find_top_k, store_results
 from utilities import RELEVANCE, DIVERSITY, NAIVE, MAX_PROB, EXACT_BASELINE
 
 # List of (n, k) tuples for experimentatio
-experiments = [(4, 3)]  
+experiments = [(8, 3)]  
 dataset_name = "hotels"
 input_query = "Affordable hotel"
 relevance_definition = "Rating_of_the_hotel"
 diversity_definition = "Physical_distance_of_the_hotels"
 metrics = [RELEVANCE, DIVERSITY]
 use_MGTs = True
-report_entropy_in_naive = 
+report_entropy_in_naive = False
 methods = [MAX_PROB, NAIVE, EXACT_BASELINE]  
 output_file = "results_hotels.csv"
 

@@ -520,15 +520,11 @@ def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables 
     # init candidate set and tables
     algorithm = EXACT_BASELINE
     start_time = time.time()
-    n = len(documents)
-    start_time_init_candidates_set = time.time()
-    total_time_determine_winner = 0
     total_time_llm_response = 0
-    total_time_compute_pdf = 0
+    n = len(documents)
     candidates_set = init_candidates_set(n, k, 0, len(metrics))
-    total_time_init_candidates_set = time.time() - start_time_init_candidates_set
     #print(candidates_set)
-    mock_tables = mocked_tables is not None
+    #mock_tables = mocked_tables is not None
     relevance_table = Metric(metrics[0], 1 ,n, dataset_name)
     diversity_table = Metric(metrics[1], n ,n, dataset_name)
     if not use_MGTs:
@@ -552,21 +548,17 @@ def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables 
             diversity_table.set(i, j, value)
             
     # entropy = call_entropy(candidates_set, algorithm)
-    start_time_compute_pdf = time.time()
     entropy_dep = call_entropy_discrete_2D(candidates_set,diversity_table,relevance_table, algorithm)
-    total_time_compute_pdf += time.time() - start_time_compute_pdf
     print("*****************************")
     # print(relevance_table)
     # print(diversity_table)
     #print("*****************************")
-    start_time_determine_winner = time.time()
     result = compute_exact_scores_baseline([relevance_table, diversity_table], candidates_set)
-    total_time_determine_winner += time.time() - start_time_determine_winner
     #print("Baseline Approach - Exact scores:\n", result)
     # print("Final entropy: ",entropy, entropy_dep)
     print("*****************************")
-    total_time=time.time() - start_time
-    duration = ComponentsTime(total_time=total_time)
+    total_time_exclude_llm_calls =time.time() - start_time
+    duration = ComponentsTime(total_time=total_time_exclude_llm_calls + total_time_llm_response)
     return TopKResult(algorithm, result, duration, choose_2(n) + n, entropy_dep)
 
 def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None, use_MGTs = False, dataset_name=None, report_entropy=False):
@@ -577,20 +569,21 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, r
     start_time = time.time()
     n = len(documents)
     count = n
+    total_time_llm_response = 0
     #print(n, choose_2(n))
     candidates_set = init_candidates_set(n, k, 0, len(metrics))
     # entropy_over_time.append(call_entropy(candidates_set))
     # entropy_dep_over_time.append(call_entropy_discrete_2D(candidates_set))
     mock_tables = mocked_tables is not None
     relevance_table = Metric(metrics[0], 1 ,n, dataset_name)
-    diversity_table = Metric(metrics[1], n ,n, dataset_name)
+    #diversity_table = Metric(metrics[1], n ,n, dataset_name)
     diversity_table2 = Metric(metrics[1], n ,n, dataset_name)
     if not use_MGTs:
         candidates_set, _ = call_all_llms_relevance(input_query, documents, relevance_table, candidates_set, k, mocked_tables[0] if mocked_tables is not None else None, relevance_definition=relevance_definition)
     else:
         mgt_df_div = find_mgt_csv(dataset_name=dataset_name, n=n, diversity_definition=diversity_definition)
         candidates_set, _, total_time_llm_response_rel = call_all_llms_relevance_MGT(dataset_name=dataset_name, relevance_table=relevance_table, candidates_set=candidates_set, relevance_definition=relevance_definition, k=k)
-        # total_time_llm_response += total_time_llm_response_rel    
+        total_time_llm_response += total_time_llm_response_rel    
     already_qsd = []
     # print(candidates_set)
     if report_entropy:
@@ -610,10 +603,10 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, r
         if not use_MGTs:
             start_time_llm_response = time.time()
             value = call_llm_diversity(i, j, documents, diversity_table=mocked_tables[1] if mocked_tables is not None else None, diversity_definition=diversity_definition)
-            # total_time_llm_response += time.time() - start_time_llm_response
+            total_time_llm_response += time.time() - start_time_llm_response
         else:
             value, time_div = call_llm_diversity_MGT(i, j, mgt_df_div)
-            # total_time_llm_response += time_div
+            total_time_llm_response += time_div
         diversity_table2.set(i, j, value)
         count += 1
         candidates_set, updated_keys = update_lb_ub_diversity(candidates_set, pair, value, k)
@@ -628,8 +621,8 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, r
     # print(diversity_table2)
     print("The best candidate - Naive approach: \n", candidates_set)
     # print("Final entropy: ",entropy_over_time[-1])
-    total_time=time.time() - start_time
-    duration = ComponentsTime(total_time=total_time)
+    total_time_exclude_llm =time.time() - start_time
+    duration = ComponentsTime(total_time=total_time_exclude_llm + total_time_llm_response)
     return TopKResult(algorithm, candidates_set, duration, count, entropy_dep_over_time)
 
 def choose_random_qs(setofdocs, already_qsd):
