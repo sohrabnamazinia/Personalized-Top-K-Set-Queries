@@ -434,8 +434,11 @@ def call_entropy_discrete_2D(candidates_set:dict, diversity_table:Metric,relevan
         counter += 1
     # print(probabilities_candidate)
     normaliser = sum(probabilities_candidate.values())
-    # print(normaliser)
-    probabilities_candidate = {key:vals/normaliser for key,vals in probabilities_candidate.items()}
+    if normaliser == 0:
+        print("Warning: Normalizer is zero. Cannot normalize probabilities.")
+        probabilities_candidate = {key: 0 for key in probabilities_candidate}  # Set all to 0 or handle as needed
+    else:
+        probabilities_candidate = {key: vals / normaliser for key, vals in probabilities_candidate.items()}
     # print(probabilities_candidate)
     entropy = -sum(map(lambda p: 0 if p==0.0 else p * math.log2(p), probabilities_candidate.values()))
     entropy = 0.0 if entropy == -0.0 else entropy
