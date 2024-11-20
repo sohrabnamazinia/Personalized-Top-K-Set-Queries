@@ -757,11 +757,11 @@ def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms
     
     return results
 
-def store_results(results, dataset_name=None):
-    if dataset_name == None:
+def store_results(results, output_name=None):
+    if output_name == None:
         filename = "results.txt"
     else:
-        filename = "restuls_" + dataset_name + ".txt"
+        filename = "Restuls_" + output_name + ".txt"
     with open(filename, 'w') as file:
         file.write("Experiment Results\n")
         file.write("==================\n\n")

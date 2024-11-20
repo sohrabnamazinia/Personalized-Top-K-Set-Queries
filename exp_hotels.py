@@ -13,7 +13,8 @@ metrics = [RELEVANCE, DIVERSITY]
 use_MGTs = True
 report_entropy_in_naive = False
 methods = [MAX_PROB, NAIVE, EXACT_BASELINE]  
-output_file = "results_hotels.csv"
+output_name = "Results_Hotels_REL_" + relevance_definition + "_DIV_" + diversity_definition 
+output_file = output_name+ ".csv"
 
 with open(output_file, mode='w', newline='') as file:
     writer = csv.writer(file)
@@ -45,6 +46,5 @@ for (n, k) in experiments:
                 result.time.total_time,
                 result.api_calls  
             ])
-store_results(all_results, dataset_name=dataset_name)
+store_results(all_results, output_name=output_name)
 print("Experiment completed. Combined results saved in:", output_file)
-print("Combined results saved in:", output_file)
