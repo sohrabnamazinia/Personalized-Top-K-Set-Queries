@@ -8,6 +8,7 @@ dataset_name = "businesses"
 input_query = "Affordable restaurant"
 relevance_definition = "Type_of_food"
 diversity_definition = "Open_hours"
+use_filtered_init_candidates = False
 report_entropy_in_naive = False
 use_MGTs = True
 metrics = [RELEVANCE, DIVERSITY]
@@ -30,7 +31,7 @@ with open(output_file, mode='w', newline='') as file:
 all_results = []
 for (n, k) in experiments:
     data = merge_plots(read_data(n=n))
-    results = find_top_k(input_query, data, k, metrics, methods, mock_llms=False, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs, report_entropy_in_naive=report_entropy_in_naive)
+    results = find_top_k(input_query, data, k, metrics, methods, mock_llms=False, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs, report_entropy_in_naive=report_entropy_in_naive, use_filtered_init_candidates = use_filtered_init_candidates)
     all_results.extend(results)
     with open(output_file, mode='a', newline='') as file:
         writer = csv.writer(file)

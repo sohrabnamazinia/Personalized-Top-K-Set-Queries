@@ -1,6 +1,7 @@
 from enum import Enum
 import itertools
 import os
+import csv
 import pandas as pd
 from math import comb
 
@@ -79,6 +80,7 @@ def compute_exact_scores_baseline(metrics, candidates_set):
     
     return result
 
+
 def check_prune(tuple_1, tuple_2):
     candidate_1, bounds_1 = tuple_1[0], tuple_1[1]
     candidate_2, bounds_2 = tuple_2[0], tuple_2[1]
@@ -129,5 +131,35 @@ def find_mgt_csv(dataset_name, n, relevance_definition=None, diversity_definitio
             raise FileNotFoundError(f"The file {mgt_file_name} was not found, and an alternative file with n=10000 was also not found.")
     else:
         raise FileNotFoundError(f"The file {mgt_file_name} was not found in the MGT_Results directory.")
+
+import csv
+import os
+
+def load_init_filtered_candidates(dataset_name, relevance_definition, diversity_definition, k):
+    # Construct the file name based on the provided inputs
+    file_name = f"FIC_{dataset_name}_Rel_{relevance_definition}_Div_{diversity_definition}_{k}.csv"
+    file_path = os.path.join("FIC_Results", file_name)
+    
+    # Initialize the candidates_set dictionary
+    candidates_set = {}
+    
+    try:
+        # Open and read the CSV file
+        with open(file_path, mode='r') as file:
+            csv_reader = csv.reader(file)
+            
+            # Process each row in the CSV
+            for row in csv_reader:
+                candidate = tuple(map(int, row))  # Convert row elements to integers
+                lb_init_value = 0.0  # Placeholder for initial lower bound
+                ub_init_value = 2.0  # Placeholder for initial upper bound
+                candidates_set[candidate] = (lb_init_value, ub_init_value)
+                
+    except FileNotFoundError:
+        print(f"Error: File {file_name} not found in the 'FIC_Results' directory.")
+    except Exception as e:
+        print(f"An error occurred while reading the file: {e}")
+    
+    return candidates_set
 
 

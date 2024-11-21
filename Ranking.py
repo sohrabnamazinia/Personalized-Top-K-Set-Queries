@@ -6,7 +6,9 @@ from copy import deepcopy
 import math
 import csv
 import random
-from utilities import RELEVANCE, DIVERSITY, NAIVE, MIN_UNCERTAINTY, MAX_PROB, EXACT_BASELINE, TopKResult, ComponentsTime, read_documents, init_candidates_set, check_pair_exist, choose_2, compute_exact_scores_baseline, check_prune, find_mgt_csv
+import pandas as pd
+import os
+from utilities import RELEVANCE, DIVERSITY, NAIVE, MIN_UNCERTAINTY, MAX_PROB, EXACT_BASELINE, TopKResult, ComponentsTime, read_documents, init_candidates_set, check_pair_exist, choose_2, compute_exact_scores_baseline, check_prune, find_mgt_csv, load_init_filtered_candidates
 from read_data_hotels import read_data, merge_descriptions
 
 class Metric:
@@ -446,7 +448,7 @@ def call_entropy_discrete_2D(candidates_set:dict, diversity_table:Metric,relevan
     # print(candidates_set, entropy)
     return round(entropy, 3), probabilities_candidate
 
-def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None, use_MGTs = False, dataset_name=None):
+def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None, use_MGTs = False, dataset_name=None, use_filtered_init_candidates = False):
     # init candidates set and tables
     algorithm = MAX_PROB
     n = len(documents)
@@ -455,7 +457,10 @@ def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None
     total_time_determine_next_question = 0
     total_time_llm_response = 0
     total_time_compute_pdf = 0
-    candidates_set = init_candidates_set(n, k, 0, len(metrics))
+    if not use_filtered_init_candidates:
+        candidates_set = init_candidates_set(n, k, 0, len(metrics))
+    else:
+        candidates_set = load_init_filtered_candidates(dataset_name=dataset_name, relevance_definition=relevance_definition, diversity_definition=diversity_definition, k=k)
     total_time_init_candidates_set = time.time() - start_time_init_candidates_set
     relevance_table = Metric(metrics[0], 1 ,n)
     diversity_table = Metric(metrics[1], n ,n)
@@ -519,13 +524,16 @@ def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None
     return TopKResult(algorithm, candidates_set, componentsTime, count, entropy_discrete_2D) 
 
 
-def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None, use_MGTs = False, dataset_name=None):
+def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None, use_MGTs = False, dataset_name=None, use_filtered_init_candidates = False):
     # init candidate set and tables
     algorithm = EXACT_BASELINE
     start_time = time.time()
     total_time_llm_response = 0
     n = len(documents)
-    candidates_set = init_candidates_set(n, k, 0, len(metrics))
+    if not use_filtered_init_candidates:
+        candidates_set = init_candidates_set(n, k, 0, len(metrics))
+    else:
+        candidates_set = load_init_filtered_candidates(dataset_name=dataset_name, relevance_definition=relevance_definition, diversity_definition=diversity_definition, k=k)
     #print(candidates_set)
     #mock_tables = mocked_tables is not None
     relevance_table = Metric(metrics[0], 1 ,n, dataset_name)
@@ -564,7 +572,7 @@ def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables 
     duration = ComponentsTime(total_time=total_time_exclude_llm_calls + total_time_llm_response)
     return TopKResult(algorithm, result, duration, choose_2(n) + n, entropy_dep)
 
-def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None, use_MGTs = False, dataset_name=None, report_entropy=False):
+def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None, use_MGTs = False, dataset_name=None, report_entropy=False, use_filtered_init_candidates = False):
     # init candidate set and tables
     entropy_over_time = []
     entropy_dep_over_time = []
@@ -574,7 +582,10 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, r
     count = n
     total_time_llm_response = 0
     #print(n, choose_2(n))
-    candidates_set = init_candidates_set(n, k, 0, len(metrics))
+    if not use_filtered_init_candidates:
+        candidates_set = init_candidates_set(n, k, 0, len(metrics))
+    else:
+        candidates_set = load_init_filtered_candidates(dataset_name=dataset_name, relevance_definition=relevance_definition, diversity_definition=diversity_definition, k=k)
     # entropy_over_time.append(call_entropy(candidates_set))
     # entropy_dep_over_time.append(call_entropy_discrete_2D(candidates_set))
     mock_tables = mocked_tables is not None
@@ -727,7 +738,7 @@ def prune(candidates_set, updated_keys):
             candidates_set.pop(key)
     return candidates_set
 
-def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms = False, is_output_discrete=True, relevance_definition = None, diversity_definition = None, dataset_name = None, use_MGTs = False, report_entropy_in_naive=False):
+def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms = False, is_output_discrete=True, relevance_definition = None, diversity_definition = None, dataset_name = None, use_MGTs = False, report_entropy_in_naive=False, use_filtered_init_candidates=False):
     results = []
     mocked_tables = None
     n = len(documents)
@@ -744,16 +755,16 @@ def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms
         # print(mocked_tables)
     
     if EXACT_BASELINE in methods:
-        results.append(find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs))
+        results.append(find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs, use_filtered_init_candidates=use_filtered_init_candidates))
 
     if NAIVE in methods:
-        results.append(find_top_k_Naive(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs, report_entropy=report_entropy_in_naive))
+        results.append(find_top_k_Naive(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs, report_entropy=report_entropy_in_naive, use_filtered_init_candidates=use_filtered_init_candidates))
 
     # if MIN_UNCERTAINTY in methods:
         # results.append(find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition))
     
     if MAX_PROB in methods:
-        results.append(find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs))
+        results.append(find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs, use_filtered_init_candidates=use_filtered_init_candidates))
     
     return results
 
@@ -761,7 +772,7 @@ def store_results(results, output_name=None):
     if output_name == None:
         filename = "results.txt"
     else:
-        filename = "Restuls_" + output_name + ".txt"
+        filename = output_name + ".txt"
     with open(filename, 'w') as file:
         file.write("Experiment Results\n")
         file.write("==================\n\n")
@@ -783,6 +794,92 @@ def store_results(results, output_name=None):
 
     print(f"Results have been stored in {filename}")
 
+def compute_exact_scores_MGT(n, k, dataset_name, relevance_definition, diversity_definition):
+    candidates_set = init_candidates_set(n, k, 0, 2)
+    metrics_names = [RELEVANCE, DIVERSITY]
+    relevance_table = Metric(metrics_names[0], 1, n, dataset_name)
+    diversity_table = Metric(metrics_names[1], n, n, dataset_name)
+
+    relevance_file = f"MGT_Results/MGT_{dataset_name}_10000_Rel_{relevance_definition}.csv"
+    mgt_df_rel = pd.read_csv(relevance_file)
+    for i in range(n):
+        relevance_value = mgt_df_rel.iloc[i]["value"]
+        relevance_table.set(0, i, relevance_value)
+
+    diversity_file = f"MGT_Results/MGT_{dataset_name}_10000_Div_{diversity_definition}.csv"
+    mgt_df_div = pd.read_csv(diversity_file)
+    for d1 in range(n):
+        for d2 in range(d1):
+            diversity_value, _ = call_llm_diversity_MGT(d1, d2, mgt_df_div)
+            diversity_table.set(d2, d1, diversity_value)
+
+    metrics = [relevance_table, diversity_table]
+    candidates_scores = compute_exact_scores_baseline(candidates_set=candidates_set, metrics=metrics)
+    return candidates_scores
+
+def filter_init_candidates(n, k, dataset_name, relevance_definition, diversity_definition, number_of_final_candidates, random_selection=False):
+    if not random_selection:
+        candidates_scores = compute_exact_scores_MGT(n, k, dataset_name, relevance_definition, diversity_definition)
+        sorted_candidates = sorted(candidates_scores.items(), key=lambda item: item[1], reverse=True)
+        final_candidates = sorted_candidates[:number_of_final_candidates]
+        return [candidate[0] for candidate in final_candidates]
+    else:
+         # Get the candidate scores
+        candidates_scores = compute_exact_scores_MGT(n, k, dataset_name, relevance_definition, diversity_definition)
+            
+        # Get the list of candidates (keys of the dictionary)
+        candidates_list = list(candidates_scores.items())
+            
+        # Randomly choose the specified number of final candidates
+        final_candidates = random.sample(candidates_list, number_of_final_candidates)
+            
+        # Return only the candidate part (without their scores)
+        return [candidate[0] for candidate in final_candidates]
+
+
+
+def store_top_k_candidates(n, k, dataset_name, relevance_definition, diversity_definition, number_of_final_candidates, random_selection=False):
+    os.makedirs("FIC_Results", exist_ok=True)
+
+    final_candidates = filter_init_candidates(
+        n, k, dataset_name, relevance_definition, diversity_definition, number_of_final_candidates, random_selection=random_selection
+    )
+
+    output_file_path = f"FIC_Results/FIC_{dataset_name}_Rel_{relevance_definition}_Div_{diversity_definition}_{k}.csv"
+
+    with open(output_file_path, mode="w", newline="") as output_file:
+        writer = csv.writer(output_file)
+        for candidate in final_candidates:
+            writer.writerow(candidate[:k])  
+
+    print(f"Results stored in {output_file_path}")
+
+def store_all_top_k_candidates(n_values, k_values, number_of_final_candidates, radnom_selection=False):
+    # Define the datasets, relevance, and diversity definitions
+    datasets = [
+        ("hotels", "Rating_of_the_hotel", "Physical_distance_of_the_hotels"),
+        ("hotels", "Distance_from_city_center", "Star_rating"),
+        ("movies", "Popularity", "Genre_and_movie_periods"),
+        ("movies", "Brief_plot", "Different_years"),
+        ("businesses", "Type_of_food", "Open_hours"),
+        ("businesses", "Location_Around_New_York", "Cost")
+    ]
+
+    # Loop through each dataset and relevance/diversity definition
+    for dataset_name, rel_def, div_def in datasets:
+        for i in range(len(n_values)):
+            n = n_values[i]
+            k = k_values[i]
+            # Call store_top_k_candidates for each combination
+            store_top_k_candidates(
+                n=n,
+                k=k,
+                dataset_name=dataset_name,
+                relevance_definition=rel_def,
+                diversity_definition=div_def,
+                number_of_final_candidates=number_of_final_candidates, random_selection=radnom_selection
+            )
+
 # # # inputs
 # input_query = "Affordable hotel"
 # relevance_definition = "Rating_of_the_hotel"
@@ -795,12 +892,13 @@ def store_results(results, output_name=None):
 # methods = [MAX_PROB, NAIVE, EXACT_BASELINE]
 # mock_llms = False
 # use_MGTs = True
+# use_filtered_init_candidates = False
 # seed = 42
 
 # # run
 # #documents = read_documents(input_path, n, mock_llms)
 # data = merge_descriptions(read_data(n=n))
-# results = find_top_k(input_query=input_query, documents=data, k=k, metrics=metrics, methods=methods, seed=seed, mock_llms=mock_llms, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=True)
+# results = find_top_k(input_query=input_query, documents=data, k=k, metrics=metrics, methods=methods, seed=seed, mock_llms=mock_llms, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=True, use_filtered_init_candidates=use_filtered_init_candidates)
 
 # # store results
 # store_results(results)
