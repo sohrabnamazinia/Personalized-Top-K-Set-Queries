@@ -670,6 +670,9 @@ def choose_next_llm_diversity_max_prob(diversity_table, candidates_set, probabil
                 candidate_pairs.remove(pair)
         if len(candidate_pairs) == 0:
             probabilities_cand.pop(winner_cand)
+            if len(probabilities_cand) == 0:
+                print("All possible questions already asked, remaining candidates have equal scores!")
+                return None
             winner_cand = max(probabilities_cand, key=probabilities_cand.get)     
             candidate_pairs = list(itertools.combinations(winner_cand, 2))
             candidate_pairs_temp = deepcopy(candidate_pairs)
