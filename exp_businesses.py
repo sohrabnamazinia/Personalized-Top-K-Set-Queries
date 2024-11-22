@@ -1,18 +1,20 @@
 import csv
 from read_data_movies import read_data, merge_plots
 from Ranking import find_top_k, store_results
-from utilities import RELEVANCE, DIVERSITY, NAIVE, MAX_PROB
+from utilities import RELEVANCE, DIVERSITY, NAIVE, MAX_PROB, EXACT_BASELINE
 
-experiments = [(5, 3)] 
+experiments = [(50, 3), (50, 5), (50, 7)] 
 dataset_name = "businesses"
 input_query = "Affordable restaurant"
 relevance_definition = "Type_of_food"
 diversity_definition = "Open_hours"
-use_filtered_init_candidates = False
+# relevance_definition = "Location_Around_New_York"
+# diversity_definition = "Cost"
+use_filtered_init_candidates = True
 report_entropy_in_naive = False
 use_MGTs = True
 metrics = [RELEVANCE, DIVERSITY]
-methods = [MAX_PROB]  
+methods = [MAX_PROB, NAIVE, EXACT_BASELINE]  
 output_name = "Results_Businesses_REL_" + relevance_definition + "_DIV_" + diversity_definition
 output_file = output_name + ".csv"
 
