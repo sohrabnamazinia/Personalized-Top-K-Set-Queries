@@ -4,13 +4,13 @@ from Ranking import find_top_k, store_results
 from utilities import RELEVANCE, DIVERSITY, NAIVE, MAX_PROB, EXACT_BASELINE
 
 # List of (n, k) tuples for experimentation
-experiments = [(50, 3), (50, 5), (50, 7)]  
+experiments = [(50, 2), (50, 4), (50, 6), (50, 8), (50, 10)]  
 dataset_name = "hotels"
 input_query = "Affordable hotel"
-# relevance_definition = "Rating_of_the_hotel"
-# diversity_definition = "Physical_distance_of_the_hotels"
-relevance_definition = "Distance_from_city_center"
-diversity_definition = "Star_rating"
+relevance_definition = "Rating_of_the_hotel"
+diversity_definition = "Physical_distance_of_the_hotels"
+# relevance_definition = "Distance_from_city_center"
+# diversity_definition = "Star_rating"
 metrics = [RELEVANCE, DIVERSITY]
 use_MGTs = True
 use_filtered_init_candidates = True
