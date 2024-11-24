@@ -5,8 +5,17 @@ def generate_plot_results(input_folder, output_folder):
     # Ensure the output folder exists
     os.makedirs(output_folder, exist_ok=True)
     
-    # Define the desired order of methods
-    method_order = ['Exact_Baseline', 'Naive', 'Max_Prob']
+    # Mapping for renaming methods
+    method_mapping = {
+        'Exact_Baseline': 'Baseline',
+        'Naive': 'Random',
+        'Max_Prob': 'EntrRed'
+    }
+    
+    # Define the desired order of renamed methods
+    method_order = [method_mapping['Exact_Baseline'], 
+                    method_mapping['Naive'], 
+                    method_mapping['Max_Prob']]
     
     # Process each file in the input folder
     for file in os.listdir(input_folder):
@@ -17,6 +26,9 @@ def generate_plot_results(input_folder, output_folder):
             # Ensure the expected columns exist
             if 'method' not in data.columns or 'k' not in data.columns or 'api_calls' not in data.columns:
                 raise ValueError(f"Unexpected file structure in {file}. Expected columns: 'method', 'k', 'api_calls'.")
+            
+            # Rename methods in the DataFrame
+            data['method'] = data['method'].replace(method_mapping)
             
             # Extract unique k values
             k_values = sorted(data['k'].unique())  # Sort k values for consistent ordering
