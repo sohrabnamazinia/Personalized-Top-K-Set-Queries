@@ -3,8 +3,8 @@ from read_data_movies import read_data, merge_plots
 from Ranking import find_top_k, store_results
 from utilities import RELEVANCE, DIVERSITY, NAIVE, MAX_PROB, EXACT_BASELINE
 
-experiments = [(500, 2), (2000, 2)]  
-# experiments = [(1000, 2)(4000, 2)]   
+experiments = [(15, 2), (64, 2)]  
+# experiments = [(32, 2)(90, 2)]   
 dataset_name = "businesses"
 input_query = "Affordable restaurant"
 relevance_definition = "Type_of_food"
