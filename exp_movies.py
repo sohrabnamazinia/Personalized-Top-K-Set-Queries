@@ -3,14 +3,15 @@ from read_data_movies import read_data, merge_plots
 from Ranking import find_top_k, store_results
 from utilities import RELEVANCE, DIVERSITY, NAIVE, MAX_PROB, EXACT_BASELINE
 
-experiments = [(50, 2), (50, 4), (50, 6), (50, 8), (50, 10)] 
+experiments = [(500, 2), (2000, 2)]  
+# experiments = [(1000, 2)(4000, 2)]    
 dataset_name = "movies"
 input_query = "A scary movie"
-# relevance_definition = "Popularity"
-# diversity_definition = "Genre_and_movie_periods"
-relevance_definition = "Brief_plot"
-diversity_definition = "Different_years"
-use_filtered_init_candidates = True
+relevance_definition = "Popularity"
+diversity_definition = "Genre_and_movie_periods"
+# relevance_definition = "Brief_plot"
+# diversity_definition = "Different_years"
+use_filtered_init_candidates = False
 report_entropy_in_naive = False
 use_MGTs = True
 metrics = [RELEVANCE, DIVERSITY]

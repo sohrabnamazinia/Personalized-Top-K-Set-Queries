@@ -162,4 +162,17 @@ def load_init_filtered_candidates(dataset_name, relevance_definition, diversity_
     
     return candidates_set
 
+def get_unique_filename(base_name):
+    name, ext = os.path.splitext(base_name)
+    counter = 1
+    while os.path.exists(base_name):
+        if "_" in name and name.rsplit('_', 1)[-1].isdigit():
+            base_name = f"{name.rsplit('_', 1)[0]}_{counter}{ext}"
+        else:
+            base_name = f"{name}_{counter}{ext}"
+        counter += 1
+    return base_name
+
+
+
 
