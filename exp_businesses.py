@@ -3,14 +3,14 @@ from read_data_movies import read_data, merge_plots
 from Ranking import find_top_k, store_results
 from utilities import RELEVANCE, DIVERSITY, NAIVE, MAX_PROB, EXACT_BASELINE
 
-experiments = [(15, 2), (64, 2)]  
-# experiments = [(32, 2)(90, 2)]   
+# experiments = [(15, 2), (64, 2)]  
+experiments = [(32, 2), (90, 2)]   
 dataset_name = "businesses"
 input_query = "Affordable restaurant"
-relevance_definition = "Type_of_food"
-diversity_definition = "Open_hours"
-# relevance_definition = "Location_Around_New_York"
-# diversity_definition = "Cost"
+# relevance_definition = "Type_of_food"
+# diversity_definition = "Open_hours"
+relevance_definition = "Location_Around_New_York"
+diversity_definition = "Cost"
 use_filtered_init_candidates = False
 report_entropy_in_naive = False
 use_MGTs = True
