@@ -1,15 +1,15 @@
 import csv
 from read_data_movies import read_data, merge_plots
 from Ranking import find_top_k, store_results
-from utilities import RELEVANCE, DIVERSITY, NAIVE, MAX_PROB, EXACT_BASELINE
+from utilities import RELEVANCE, DIVERSITY, NAIVE, MAX_PROB, EXACT_BASELINE, get_unique_filename
 
 # experiments = [(15, 2), (64, 2)]  
-experiments = [(32, 2), (90, 2)]     
+experiments = [(3, 2), (6, 2)]     
 dataset_name = "movies"
 input_query = "A scary movie"
-# relevance_definition = "Popularity"
+# relevance_definition = "Popularity" # 15
 # diversity_definition = "Genre_and_movie_periods"
-relevance_definition = "Brief_plot"
+relevance_definition = "Brief_plot" #15, 90
 diversity_definition = "Different_years"
 use_filtered_init_candidates = False
 report_entropy_in_naive = False
@@ -17,7 +17,7 @@ use_MGTs = True
 metrics = [RELEVANCE, DIVERSITY]
 methods = [MAX_PROB, NAIVE, EXACT_BASELINE]  
 output_name = "Results_Movies_REL_" + relevance_definition + "_DIV_" + diversity_definition
-output_file = output_name + ".csv"
+output_file = get_unique_filename(output_name+ ".csv")
 
 
 with open(output_file, mode='w', newline='') as file:
