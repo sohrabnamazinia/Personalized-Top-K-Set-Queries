@@ -1,4 +1,0 @@
-n,k,method,total_time_init_candidates_set,total_time_update_bounds,total_time_compute_pdf,total_time_determine_next_question,total_time_llm_response,total_time,api_calls
-15,2,Exact_Baseline,,,,,,70.96280325571213,120
-15,2,Naive,,,,,,18.23525635988625,28
-15,2,Max_Prob,1.3828277587890625e-05,0.00029397010803222656,8.612726926803589,0.0003745555877685547,15.142757326440433,23.75616660721741,23
