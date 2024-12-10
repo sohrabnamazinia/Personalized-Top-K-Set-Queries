@@ -448,6 +448,47 @@ def call_entropy_discrete_2D(candidates_set:dict, diversity_table:Metric,relevan
     # print(candidates_set, entropy)
     return round(entropy, 3), probabilities_candidate
 
+def prob_score(bound, other_bound):
+    c_lb, c_ub = bound
+    o_lb, o_ub = other_bound
+    # edge cases
+    if c_lb > o_ub: 
+        return 1
+    if c_ub < o_lb:
+        return 0
+    if c_lb == o_lb and c_ub == o_ub:
+        return 0.5
+    # usual case if c and o partially overlap with c range > o range
+    if c_ub > o_ub and c_lb > o_lb:
+        return (c_ub-o_ub)/(c_ub-c_lb)*1 + (o_ub-c_lb)/(c_ub-c_lb)*0.5
+    # usual case if c and o partially overlap with c range < o range
+    if (c_ub < o_ub and c_lb < o_lb) or (c_ub == o_ub and c_lb < o_lb):
+        return (c_ub-o_lb)/(c_ub-c_lb)*0.5
+    # other cases of complete overlap with equal bound on one end
+    if (c_ub < o_ub and c_lb > o_lb) or (c_ub == o_ub and c_lb > o_lb) or (c_lb == o_lb and c_ub < o_ub): 
+        return 0.5
+    if (c_ub > o_ub and c_lb < o_lb) or (c_lb == o_lb and c_ub > o_ub):
+        return (c_ub-o_ub)/(c_ub-c_lb)*1 + (o_ub-o_lb)/(c_ub-c_lb)*0.5 
+
+def call_entropy_ind(candidates_set, algorithm= None):
+    if algorithm == NAIVE or algorithm == EXACT_BASELINE:
+        return 0
+    if len(candidates_set) == 1:
+        return 0  # When only 1 candidate is left, it is clearly the winner now so entropy becomes 0 automatically
+    probabilities_candidate = {}
+    mock_set = deepcopy(candidates_set)
+    for cand, bound in candidates_set.items():
+        mock_set.pop(cand)
+        for other_cand, other_bound in mock_set.items():
+            prob_score_cand = prob_score(bound, other_bound)
+            prob_score_other = 1 - prob_score_cand
+            probabilities_candidate[cand] = probabilities_candidate.get(cand, 1) * prob_score_cand
+            probabilities_candidate[other_cand] = probabilities_candidate.get(other_cand, 1) * prob_score_other
+    # print(probabilities_candidate)
+    entropy = -sum(map(lambda p: 0 if p==0 else p * math.log2(p), probabilities_candidate.values()))
+    # print(candidates_set, entropy)
+    return round(entropy, 4)
+
 def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None, use_MGTs = False, dataset_name=None, use_filtered_init_candidates = False):
     # init candidates set and tables
     algorithm = MAX_PROB
@@ -464,7 +505,7 @@ def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None
     total_time_init_candidates_set = time.time() - start_time_init_candidates_set
     relevance_table = Metric(metrics[0], 1 ,n)
     diversity_table = Metric(metrics[1], n ,n)
-    entropy_over_time = []
+    entropy_ind_over_time = []
     entropy_discrete_2D = []
     # entropy_over_time.append(call_entropy(candidates_set))
     # entropy_dep_over_time.append(call_entropy_dependence(candidates_set))
@@ -487,10 +528,13 @@ def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None
         start_time_compute_pdf = time.time()
         entropy_dep, probabilities_cand = call_entropy_discrete_2D(candidates_set,diversity_table,relevance_table)
         total_time_compute_pdf += time.time() - start_time_compute_pdf
+
+        entropy_ind = call_entropy_ind(candidates_set)
         # print(f"Entropy at iteration {count}: ",entropy)
         #print(f"Entropy (dep) at iteration {its}: ",entropy_dep)
         # entropy_over_time.append(entropy)
         entropy_discrete_2D.append(entropy_dep)
+        entropy_ind_over_time.append(entropy_ind)
         start_time_determine_next_question = time.time()
         pair = choose_next_llm_diversity_max_prob(diversity_table, candidates_set, probabilities_cand, determined_qs)
         total_time_determine_next_question += time.time() - start_time_determine_next_question
@@ -514,6 +558,8 @@ def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None
     # entropy_over_time.append(call_entropy(candidates_set))
     entropy_dep, probabilities_cand = call_entropy_discrete_2D(candidates_set,diversity_table,relevance_table)
     entropy_discrete_2D.append(entropy_dep)
+    entropy_ind = call_entropy_ind(candidates_set)
+    entropy_ind_over_time.append(entropy_ind)
     #print(relevance_table)
     #print(diversity_table)
     print("*************************************")
@@ -560,6 +606,7 @@ def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables 
             
     # entropy = call_entropy(candidates_set, algorithm)
     entropy_dep = call_entropy_discrete_2D(candidates_set,diversity_table,relevance_table, algorithm)
+    entropy_ind = call_entropy_ind(candidates_set, algorithm)
     print("*****************************")
     # print(relevance_table)
     # print(diversity_table)
@@ -574,7 +621,7 @@ def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables 
 
 def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None, use_MGTs = False, dataset_name=None, report_entropy=False, use_filtered_init_candidates = False):
     # init candidate set and tables
-    entropy_over_time = []
+    entropy_ind_over_time = []
     entropy_dep_over_time = []
     algorithm = NAIVE
     start_time = time.time()
@@ -603,6 +650,8 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, r
     if report_entropy:
         entropy, _ = call_entropy_discrete_2D(candidates_set,diversity_table2,relevance_table)
         entropy_dep_over_time.append(entropy)
+        entropy_ind = call_entropy_ind(candidates_set)
+        entropy_ind_over_time.append(entropy_ind)
     its = 0
     while(len(candidates_set) > 1):
         # print(candidates_set)
@@ -629,6 +678,8 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, r
         if report_entropy:
             entropy, _ = call_entropy_discrete_2D(candidates_set,diversity_table2,relevance_table)
             entropy_dep_over_time.append(entropy)
+            entropy_ind = call_entropy_ind(candidates_set)
+            entropy_ind_over_time.append(entropy_ind)
         #print(f"Entropy at iteration {its} for Naive approach: ", entropy_dep_over_time[-1])
 
     # print(relevance_table)
