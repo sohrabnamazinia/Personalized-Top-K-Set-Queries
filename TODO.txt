@@ -1,0 +1,8 @@
+for scalibility:
+    1. set independence_assumption = True, use_filtered_init_candidates = False
+    2. set experiments = [(x, 2), (y, 2), ...] s.t. total number of candidates are 500, 1000, 2000, 4000, 8000, 16000, 32000  
+
+for measure cost:
+    1. run generate_filtered_init_candidates.py for larger n values (500 at least)
+    2. set independence_assumption = True/False, use_filtered_init_candidates = True
+    3. set experiments = [(50, 2), (50, 4), (50, 6), (50, 8), (50, 10)] 
