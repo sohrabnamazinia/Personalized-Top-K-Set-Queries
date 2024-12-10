@@ -487,9 +487,9 @@ def call_entropy_ind(candidates_set, algorithm= None):
     # print(probabilities_candidate)
     entropy = -sum(map(lambda p: 0 if p==0 else p * math.log2(p), probabilities_candidate.values()))
     # print(candidates_set, entropy)
-    return round(entropy, 4)
+    return round(entropy, 4), probabilities_candidate
 
-def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None, use_MGTs = False, dataset_name=None, use_filtered_init_candidates = False):
+def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None, use_MGTs = False, dataset_name=None, use_filtered_init_candidates = False, independence_assumption = False):
     # init candidates set and tables
     algorithm = MAX_PROB
     n = len(documents)
@@ -505,8 +505,7 @@ def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None
     total_time_init_candidates_set = time.time() - start_time_init_candidates_set
     relevance_table = Metric(metrics[0], 1 ,n)
     diversity_table = Metric(metrics[1], n ,n)
-    entropy_ind_over_time = []
-    entropy_discrete_2D = []
+    entropy_over_time = []
     # entropy_over_time.append(call_entropy(candidates_set))
     # entropy_dep_over_time.append(call_entropy_dependence(candidates_set))
     # use all relevance llm calls
@@ -526,15 +525,16 @@ def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None
         print("Iteration: " + str(its) + ", No. Candidates: " + str(len(candidates_set)))
         # entropy = call_entropy(candidates_set)
         start_time_compute_pdf = time.time()
-        entropy_dep, probabilities_cand = call_entropy_discrete_2D(candidates_set,diversity_table,relevance_table)
+        if not independence_assumption:
+            entropy, probabilities_cand = call_entropy_discrete_2D(candidates_set,diversity_table,relevance_table)
+        else:
+            entropy, probabilities_cand = call_entropy_ind(candidates_set)
         total_time_compute_pdf += time.time() - start_time_compute_pdf
 
-        entropy_ind = call_entropy_ind(candidates_set)
         # print(f"Entropy at iteration {count}: ",entropy)
         #print(f"Entropy (dep) at iteration {its}: ",entropy_dep)
         # entropy_over_time.append(entropy)
-        entropy_discrete_2D.append(entropy_dep)
-        entropy_ind_over_time.append(entropy_ind)
+        entropy_over_time.append(entropy)
         start_time_determine_next_question = time.time()
         pair = choose_next_llm_diversity_max_prob(diversity_table, candidates_set, probabilities_cand, determined_qs)
         total_time_determine_next_question += time.time() - start_time_determine_next_question
@@ -556,10 +556,11 @@ def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None
         its+=1
 
     # entropy_over_time.append(call_entropy(candidates_set))
-    entropy_dep, probabilities_cand = call_entropy_discrete_2D(candidates_set,diversity_table,relevance_table)
-    entropy_discrete_2D.append(entropy_dep)
-    entropy_ind = call_entropy_ind(candidates_set)
-    entropy_ind_over_time.append(entropy_ind)
+    if not independence_assumption:
+        entropy = call_entropy_discrete_2D(candidates_set,diversity_table,relevance_table)
+    else:
+        entropy = call_entropy_ind(candidates_set)
+    entropy_over_time.append(entropy)
     #print(relevance_table)
     #print(diversity_table)
     print("*************************************")
@@ -567,7 +568,7 @@ def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None
     print("Total number of calls: " , count)
     # print("Final entropy: ", entropy_over_time[-1])
     componentsTime = ComponentsTime(total_time_init_candidates_set=total_time_init_candidates_set, total_time_update_bounds=total_time_update_bounds, total_time_compute_pdf=total_time_compute_pdf, total_time_determine_next_question=total_time_determine_next_question, total_time_llm_response=total_time_llm_response)
-    return TopKResult(algorithm, candidates_set, componentsTime, count, entropy_discrete_2D) 
+    return TopKResult(algorithm, candidates_set, componentsTime, count, entropy_over_time) 
 
 
 def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None, use_MGTs = False, dataset_name=None, use_filtered_init_candidates = False):
@@ -606,7 +607,6 @@ def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables 
             
     # entropy = call_entropy(candidates_set, algorithm)
     entropy_dep = call_entropy_discrete_2D(candidates_set,diversity_table,relevance_table, algorithm)
-    entropy_ind = call_entropy_ind(candidates_set, algorithm)
     print("*****************************")
     # print(relevance_table)
     # print(diversity_table)
@@ -650,7 +650,7 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, r
     if report_entropy:
         entropy, _ = call_entropy_discrete_2D(candidates_set,diversity_table2,relevance_table)
         entropy_dep_over_time.append(entropy)
-        entropy_ind = call_entropy_ind(candidates_set)
+        entropy_ind, _ = call_entropy_ind(candidates_set)
         entropy_ind_over_time.append(entropy_ind)
     its = 0
     while(len(candidates_set) > 1):
@@ -678,7 +678,7 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, r
         if report_entropy:
             entropy, _ = call_entropy_discrete_2D(candidates_set,diversity_table2,relevance_table)
             entropy_dep_over_time.append(entropy)
-            entropy_ind = call_entropy_ind(candidates_set)
+            entropy_ind, _ = call_entropy_ind(candidates_set)
             entropy_ind_over_time.append(entropy_ind)
         #print(f"Entropy at iteration {its} for Naive approach: ", entropy_dep_over_time[-1])
 
@@ -792,7 +792,7 @@ def prune(candidates_set, updated_keys):
             candidates_set.pop(key)
     return candidates_set
 
-def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms = False, is_output_discrete=True, relevance_definition = None, diversity_definition = None, dataset_name = None, use_MGTs = False, report_entropy_in_naive=False, use_filtered_init_candidates=False):
+def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms = False, is_output_discrete=True, relevance_definition = None, diversity_definition = None, dataset_name = None, use_MGTs = False, report_entropy_in_naive=False, use_filtered_init_candidates=False, independence_assumption=False):
     results = []
     mocked_tables = None
     n = len(documents)
@@ -818,7 +818,7 @@ def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms
         # results.append(find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition))
     
     if MAX_PROB in methods:
-        results.append(find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs, use_filtered_init_candidates=use_filtered_init_candidates))
+        results.append(find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs, use_filtered_init_candidates=use_filtered_init_candidates, independence_assumption=independence_assumption))
     
     return results
 
