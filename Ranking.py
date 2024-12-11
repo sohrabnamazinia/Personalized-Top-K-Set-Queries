@@ -8,7 +8,7 @@ import csv
 import random
 import pandas as pd
 import os
-from utilities import RELEVANCE, DIVERSITY, NAIVE, MIN_UNCERTAINTY, MAX_PROB, EXACT_BASELINE, TopKResult, ComponentsTime, read_documents, init_candidates_set, check_pair_exist, choose_2, compute_exact_scores_baseline, check_prune, find_mgt_csv, load_init_filtered_candidates
+from utilities import RELEVANCE, DIVERSITY, NAIVE, MIN_UNCERTAINTY, MAX_PROB, EXACT_BASELINE, TopKResult, ComponentsTime, read_documents, init_candidates_set, check_pair_exist, choose_2, compute_exact_scores_baseline, check_prune, find_mgt_csv, load_init_filtered_candidates, init_candidates_set_random_subset
 from read_data_hotels import read_data, merge_descriptions
 
 class Metric:
@@ -879,16 +879,19 @@ def filter_init_candidates(n, k, dataset_name, relevance_definition, diversity_d
         return [candidate[0] for candidate in final_candidates]
     else:
          # Get the candidate scores
-        candidates_scores = compute_exact_scores_MGT(n, k, dataset_name, relevance_definition, diversity_definition)
-            
+        #candidates_scores = compute_exact_scores_MGT(n, k, dataset_name, relevance_definition, diversity_definition)
+        
         # Get the list of candidates (keys of the dictionary)
-        candidates_list = list(candidates_scores.items())
-            
+        #candidates_list = list(candidates_scores.items())
+
+        candidates_list = list(init_candidates_set_random_subset(n, k, 0, 2, number_of_final_candidates))
+
+
         # Randomly choose the specified number of final candidates
         final_candidates = random.sample(candidates_list, number_of_final_candidates)
             
         # Return only the candidate part (without their scores)
-        return [candidate[0] for candidate in final_candidates]
+        return [candidate for candidate in final_candidates]
 
 
 

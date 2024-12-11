@@ -4,6 +4,7 @@ import os
 import csv
 import pandas as pd
 from math import comb
+import random
 
 MAX_PROB, MIN_UNCERTAINTY, EXACT_BASELINE, NAIVE = "Max_Prob", "Min_Uncertainty", "Exact_Baseline", "Naive"
 RELEVANCE, DIVERSITY = "relevance", "diversity"
@@ -48,6 +49,20 @@ def init_candidates_set(n, k, lb_init_value, ub_init_value):
     combinations = itertools.combinations(range(n), k)
     candidates_set = {(combination): (lb_init_value, ub_init_value) for combination in combinations}
     return candidates_set
+
+
+def init_candidates_set_random_subset(n, k, lb_init_value, ub_init_value, count):
+    candidates_set = {}
+    seen_combinations = set()  # To ensure uniqueness
+
+    while len(candidates_set) < count:
+        combination = tuple(sorted(random.sample(range(n), k)))  # Generate a random combination
+        if combination not in seen_combinations:
+            seen_combinations.add(combination)
+            candidates_set[combination] = (lb_init_value, ub_init_value)
+    
+    return candidates_set
+
 
 def check_pair_exist(candidate, pair):
     return (pair[0] in candidate and pair[1] in candidate)

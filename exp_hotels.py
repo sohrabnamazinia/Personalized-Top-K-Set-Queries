@@ -5,7 +5,7 @@ from utilities import RELEVANCE, DIVERSITY, NAIVE, MAX_PROB, EXACT_BASELINE, get
 
 # List of (n, k) tuples for experimentation
 # experiments = [(15, 2), (64, 2)]  
-experiments = [(20, 2)] 
+experiments = [(1000, 2), (1000, 4), (1000, 6), (1000, 8), (1000, 10)] 
 dataset_name = "hotels"
 input_query = "Affordable hotel"
 relevance_definition = "Rating_of_the_hotel"
@@ -14,10 +14,10 @@ diversity_definition = "Physical_distance_of_the_hotels"
 # diversity_definition = "Star_rating"
 metrics = [RELEVANCE, DIVERSITY]
 use_MGTs = True
-use_filtered_init_candidates = False
+use_filtered_init_candidates = True
 report_entropy_in_naive = False
-independence_assumption = True
-methods = [MAX_PROB, NAIVE, EXACT_BASELINE]  
+independence_assumption = False
+methods = [MAX_PROB, NAIVE]  
 output_name = "Results_Hotels_REL_" + relevance_definition + "_DIV_" + diversity_definition
 output_file = get_unique_filename(output_name+ ".csv")
 
