@@ -4,19 +4,19 @@ from Ranking import find_top_k, store_results
 from utilities import RELEVANCE, DIVERSITY, NAIVE, MAX_PROB, EXACT_BASELINE, get_unique_filename
 
 # experiments = [(15, 2), (64, 2)]  
-experiments = [(1000, 2), (1000, 4), (1000, 6), (1000, 8), (1000, 10)] 
+experiments = [(45, 2), (64, 2), (90, 2), (142, 2), (201, 2)]  
 dataset_name = "movies"
 input_query = "A scary movie"
-# relevance_definition = "Popularity" 
-# diversity_definition = "Genre_and_movie_periods"
-relevance_definition = "Brief_plot" 
-diversity_definition = "Different_years"
-use_filtered_init_candidates = True
+relevance_definition = "Popularity" 
+diversity_definition = "Genre_and_movie_periods"
+# relevance_definition = "Brief_plot" 
+# diversity_definition = "Different_years"
+use_filtered_init_candidates = False
 independence_assumption = True
 report_entropy_in_naive = False
 use_MGTs = True
 metrics = [RELEVANCE, DIVERSITY]
-methods = [MAX_PROB, NAIVE]  
+methods = [MAX_PROB, NAIVE, EXACT_BASELINE]  
 output_name = "Results_Movies_REL_" + relevance_definition + "_DIV_" + diversity_definition
 output_file = get_unique_filename(output_name+ ".csv")
 

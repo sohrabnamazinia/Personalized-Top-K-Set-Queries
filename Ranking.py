@@ -655,7 +655,7 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, r
     its = 0
     while(len(candidates_set) > 1):
         # print(candidates_set)
-        if its % 100 == 0:
+        if its % 10 == 0:
             print("Naive: iteration number ", its)
         its += 1
         setofdocs = set()

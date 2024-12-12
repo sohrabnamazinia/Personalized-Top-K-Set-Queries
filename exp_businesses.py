@@ -4,19 +4,19 @@ from Ranking import find_top_k, store_results
 from utilities import RELEVANCE, DIVERSITY, NAIVE, MAX_PROB, EXACT_BASELINE, get_unique_filename
 
 # experiments = [(15, 2), (64, 2)]  
-experiments = [(1000, 2), (1000, 4), (1000, 6), (1000, 8), (1000, 10)] 
+experiments = [(45, 2), (64, 2), (90, 2), (142, 2), (201, 2)] 
 dataset_name = "businesses"
 input_query = "Affordable restaurant"
 relevance_definition = "Type_of_food" 
 diversity_definition = "Open_hours"
 # relevance_definition = "Location_Around_New_York" 
 # diversity_definition = "Cost"
-use_filtered_init_candidates = True
+use_filtered_init_candidates = False
 report_entropy_in_naive = False
 independence_assumption = True
 use_MGTs = True
 metrics = [RELEVANCE, DIVERSITY]
-methods = [MAX_PROB, NAIVE]  
+methods = [MAX_PROB, NAIVE, EXACT_BASELINE]  
 output_name = "Results_Businesses_REL_" + relevance_definition + "_DIV_" + diversity_definition
 output_file = get_unique_filename(output_name+ ".csv")
 
