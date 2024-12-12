@@ -8,10 +8,10 @@ from utilities import RELEVANCE, DIVERSITY, NAIVE, MAX_PROB, EXACT_BASELINE, get
 experiments = [(45, 2), (64, 2), (90, 2), (142, 2), (201, 2)] 
 dataset_name = "hotels"
 input_query = "Affordable hotel"
-relevance_definition = "Rating_of_the_hotel"
-diversity_definition = "Physical_distance_of_the_hotels"
-# relevance_definition = "Distance_from_city_center"
-# diversity_definition = "Star_rating"
+# relevance_definition = "Rating_of_the_hotel"
+# diversity_definition = "Physical_distance_of_the_hotels"
+relevance_definition = "Distance_from_city_center"
+diversity_definition = "Star_rating"
 metrics = [RELEVANCE, DIVERSITY]
 use_MGTs = True
 independence_assumption = True
