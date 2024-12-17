@@ -1,34 +1,30 @@
 import os
 import pandas as pd
 
-# Define the folder path
+# Folder path
 folder_path = "Plot_Scalibility"
 
-# Define the mapping
-value_mapping = {
-    1000: "1k",
-    5000: "5k",
-    10000: "10k",
-    15000: "15k",
-    20000: "20k"
+# Mapping dictionary
+reverse_mapping = {
+    '1k': 1000,
+    '5k': 5000,
+    '10k': 10000,
+    '15k': 15000,
+    '20k': 20000
 }
 
-# Iterate over all CSV files in the folder
+# Go through all CSV files in the folder
 for file_name in os.listdir(folder_path):
-    if file_name.endswith(".csv"):  # Process only CSV files
+    if file_name.endswith(".csv"):
         file_path = os.path.join(folder_path, file_name)
         
-        # Read the CSV file
+        # Read CSV
         df = pd.read_csv(file_path)
         
-        # Check if the first column exists
-        if df.shape[1] > 0:
-            first_column_name = df.columns[0]
-            
-            # Replace values in the first column based on mapping
-            df[first_column_name] = df[first_column_name].replace(value_mapping)
-        
-        # Save the updated CSV file back to the same location
+        # Check and replace values in the first column
+        df.iloc[:, 0] = df.iloc[:, 0].replace(reverse_mapping)
+
+        # Save back to the same file
         df.to_csv(file_path, index=False)
 
-print("All files have been updated successfully.")
+print("Reverted '1k', '5k', etc. back to numerical values in all CSV files.")
