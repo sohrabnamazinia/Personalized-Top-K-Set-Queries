@@ -94,9 +94,9 @@ To get started with the framework, follow these steps:
 Cost in this context refers to the number of LLM calls made during the execution of the framework. The different methods vary in cost:
 
 - **EntrRedDep**: This method has the lowest cost, as it minimizes LLM calls, making it the most efficient.
-- **EntrRedInd**: This method has a slightly higher cost than EntrRedDep but still remains much more efficient compared to other methods, especially when compared to Random.
-- **Random**: The Random method involves more LLM calls and is significantly more costly than the other methods.
-- **Baseline**: This method incurs the maximum cost, as it requires all possible LLM calls to evaluate every candidate in the dataset.
+- **EntrRedInd**: This method has a slightly higher cost than EntrRedDep but still remains much more efficient compared to other methods.
+- **Random**: The Random method involves more LLM calls and is significantly more costly than our methods. 
+- **Baseline**: This method incurs the maximum cost, as it requires all possible LLM calls to evaluate every candidate's exact score. 
 
 ### Scalability Analysis
 
