@@ -29,6 +29,6 @@ def read_data(input_file="businesses.csv", n=1000):
 
     return (data_list_businesses_info, data_list_businesses_photos)
 
-# data = read_data(n=10000)  
-# print(len(data[0]))
-# print(len(data[1]))
+data = read_data(n=10000)  
+print(len(data[0]))
+print(len(data[1]))

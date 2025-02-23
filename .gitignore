@@ -3,9 +3,9 @@ OPENAI_API_KEY.txt
 
 # Ignore virtual environment
 llm/
-dataset_hotelss/
-dataset_moviess/
-dataset_businesses/businesses_photoss
+dataset_hotels/
+dataset_movies/
+dataset_businesses/businesses_photos
 .venv/
 
 # ignore environ files
