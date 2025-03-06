@@ -2,13 +2,14 @@ import numpy as np
 import itertools
 import time
 from LLMApi import LLMApi
+from LLMApi_llama import LLMApiLlama
 from copy import deepcopy
 import math
 import csv
 import random
 import pandas as pd
 import os
-from utilities import RELEVANCE, DIVERSITY, NAIVE, MIN_UNCERTAINTY, MAX_PROB, EXACT_BASELINE, TopKResult, ComponentsTime, read_documents, init_candidates_set, check_pair_exist, choose_2, compute_exact_scores_baseline, check_prune, find_mgt_csv, load_init_filtered_candidates, init_candidates_set_random_subset
+from utilities import RELEVANCE, DIVERSITY, NAIVE, MIN_UNCERTAINTY, MAX_PROB, EXACT_BASELINE, CHATGPT, LLAMA, TopKResult, ComponentsTime, read_documents, init_candidates_set, check_pair_exist, choose_2, compute_exact_scores_baseline, check_prune, find_mgt_csv, load_init_filtered_candidates, init_candidates_set_random_subset
 from read_data_hotels import read_data, merge_descriptions
 
 class Metric:
@@ -191,23 +192,33 @@ def call_all_llms_relevance_MGT(dataset_name, relevance_table, candidates_set, k
     return candidates_set, updated_candidates, total_time_rel
 
 
-def call_llm_relevance(query, d, documents, relevance_definition=None, relevance_table = None):
+def call_llm_relevance(query, d, documents, relevance_definition=None, relevance_table = None, llm_model=CHATGPT):
     # Case: Mocked LLM - d is integer
     if relevance_table is not None:
         return relevance_table[0][d]
     
     # Case: Real LLM - d is the string document
-    api = LLMApi(relevance_definition=relevance_definition)
+    if llm_model == CHATGPT:
+        api = LLMApi(relevance_definition=relevance_definition)
+    elif llm_model == LLAMA:
+        api = LLMApiLlama(relevance_definition=relevance_definition)
+    else:
+        raise ValueError("Invalid LLM model")
     result = api.call_llm_relevance(query, documents[d])
     return result
 
-def call_llm_diversity(d1, d2, documents, diversity_table = None, diversity_definition = None):
+def call_llm_diversity(d1, d2, documents, diversity_table = None, diversity_definition = None, llm_model=CHATGPT):
     # Case: Mocked LLM - d is integer
     if diversity_table is not None:
         return diversity_table[d1][d2]
     
     # Case: Real LLM - d is the string document
-    api = LLMApi(diversity_definition=diversity_definition)
+    if llm_model == CHATGPT:
+        api = LLMApi(diversity_definition=diversity_definition)
+    elif llm_model == LLAMA:
+        api = LLMApiLlama(diversity_definition=diversity_definition)
+    else:
+        raise ValueError("Invalid LLM model")
     result = api.call_llm_diversity(documents[d1], documents[d2])
     return result
 
@@ -219,14 +230,19 @@ def call_llm_diversity_MGT(d1, d2, mgt_df_div):
 
     return value, time_div
 
-def call_llm_image(query, d, images, relevance_definition=None, relevance_table = None, images_directory=None):
+def call_llm_image(query, d, images, relevance_definition=None, relevance_table = None, images_directory=None, llm_model=CHATGPT):
     # Case: Mocked LLM - d is integer
     if relevance_table is not None:
         return relevance_table[0][d]
     
     # Case: Real LLM - d is the string document
     image_path = images_directory + str(images[d].photo_id)
-    api = LLMApi(relevance_definition=relevance_definition)
+    if llm_model == CHATGPT:
+        api = LLMApi(image_relevance_definition=relevance_definition)
+    elif llm_model == LLAMA:
+        api = LLMApiLlama(image_relevance_definition=relevance_definition)
+    else:
+        raise ValueError("Invalid LLM model")
     result = api.call_llm_image(query, image_path)
     return result
 

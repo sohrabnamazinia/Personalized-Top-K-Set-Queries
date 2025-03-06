@@ -8,6 +8,7 @@ import random
 
 MAX_PROB, MIN_UNCERTAINTY, EXACT_BASELINE, NAIVE = "Max_Prob", "Min_Uncertainty", "Exact_Baseline", "Naive"
 RELEVANCE, DIVERSITY = "relevance", "diversity"
+CHATGPT, LLAMA = "ChatGPT", "LLAMA"
 
 class TopKResult:
     def __init__(self, algorithm, candidates_set, time, api_calls, entropydep) -> None:
