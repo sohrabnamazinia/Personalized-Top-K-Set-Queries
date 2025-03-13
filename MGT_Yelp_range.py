@@ -26,8 +26,8 @@ for n in experiments:
     diversity_table = Metric(metrics[1], n ,n, dataset_name)
     
     start_time = time.time()
-    relevance_table.call_all_randomized_involved(buisinesses_photos, input_query, relevance_definition=relevance_definition, sequential_randomized_length = sequential_randomized_length_relevance, is_image_type=True, images_directory=images_directory)
-    diversity_table.call_all_randomized_involved(buisinesses_info, diversity_definition=diversity_definition, sequential_randomized_length = sequential_randomized_length_diversity)
+    relevance_table.call_all_randomized_involved_range(buisinesses_photos, input_query, relevance_definition=relevance_definition, sequential_randomized_length = sequential_randomized_length_relevance, is_image_type=True, images_directory=images_directory)
+    diversity_table.call_all_randomized_involved_range(buisinesses_info, diversity_definition=diversity_definition, sequential_randomized_length = sequential_randomized_length_diversity)
     duration = time.time() - start_time
 
     print(f"{time.time()}: Experiment for dataset {dataset_name} with n={n}, relevance definition '{relevance_definition}', and diversity definition '{diversity_definition}' is done.")

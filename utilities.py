@@ -73,6 +73,38 @@ def choose_2(k):
         return 0  
     return k * (k - 1) // 2
 
+def compute_exact_scores_baseline_range(metrics, candidates_set):
+    relevance_table = metrics[0].table
+    diversity_table = metrics[1].table
+    k = len(next(iter(candidates_set)))
+    result = {}
+
+    for candidate, _ in candidates_set.items():
+        relevance_scores_lb = [relevance_table[0, doc][0] for doc in candidate]  # Extract lower bounds
+        relevance_scores_ub = [relevance_table[0, doc][1] for doc in candidate]  # Extract upper bounds
+        relevance_score_lb = sum(relevance_scores_lb) / k
+        relevance_score_ub = sum(relevance_scores_ub) / k
+
+        diversity_scores_lb = 0
+        diversity_scores_ub = 0
+        candidate_list = list(candidate)
+        for i in range(k):
+            for j in range(i + 1, k):
+                div_lb, div_ub = diversity_table[candidate_list[i], candidate_list[j]]  # Extract bounds
+                diversity_scores_lb += div_lb
+                diversity_scores_ub += div_ub
+
+        diversity_score_lb = diversity_scores_lb / choose_2(k)
+        diversity_score_ub = diversity_scores_ub / choose_2(k)
+
+        total_score_lb = relevance_score_lb + diversity_score_lb
+        total_score_ub = relevance_score_ub + diversity_score_ub
+
+        result[candidate] = (total_score_lb, total_score_ub)
+
+    return result
+
+
 def compute_exact_scores_baseline(metrics, candidates_set):
     relevance_table = metrics[0].table
     diversity_table = metrics[1].table
@@ -103,6 +135,51 @@ def check_prune(tuple_1, tuple_2):
     if bounds_1[0] >= bounds_2[1]: return candidate_2
     if bounds_2[0] >= bounds_1[1]: return candidate_1
     return None  
+
+def find_mgt_csv_range(dataset_name, n, relevance_definition=None, diversity_definition=None, create_if_not_exists=True):
+    if diversity_definition is None:
+        mgt_file_name = f"MGT_{dataset_name}_{n}_Rel_{relevance_definition}.csv"
+    if relevance_definition is None:
+        mgt_file_name = f"MGT_{dataset_name}_{n}_Div_{diversity_definition}.csv"
+    
+    current_dir = os.getcwd()
+    file_path = os.path.join(current_dir, "MGT_Range_Results", mgt_file_name)  # Look in MGT_Range_Results folder
+    
+    if os.path.isfile(file_path):
+        try:
+            df = pd.read_csv(file_path)
+            return df
+        except Exception as e:
+            raise RuntimeError(f"Error reading CSV file: {e}")
+    elif create_if_not_exists:
+        # Look for the file with n=10000
+        if relevance_definition is None:
+            alt_file_name = f"MGT_{dataset_name}_10000_Div_{diversity_definition}.csv"
+        elif diversity_definition is None:
+            alt_file_name = f"MGT_{dataset_name}_10000_Rel_{relevance_definition}.csv"
+        alt_file_path = os.path.join(current_dir, "MGT_Range_Results", alt_file_name)  # Look in MGT_Range_Results folder
+        
+        if os.path.isfile(alt_file_path):
+            try:
+                alt_df = pd.read_csv(alt_file_path)
+                # Determine subset size
+                if diversity_definition is None:
+                    subset_size = n
+                elif relevance_definition is None:
+                    subset_size = comb(n, 2)
+                subset_df = alt_df.head(subset_size)
+                # Save the new subset file
+                subset_file_path = file_path  # Same file path as the original search
+                subset_df.to_csv(subset_file_path, index=False)
+                print(f"Subset CSV file created: {subset_file_path}")
+                return subset_df
+            except Exception as e:
+                raise RuntimeError(f"Error reading alternative CSV file: {e}")
+        else:
+            raise FileNotFoundError(f"The file {mgt_file_name} was not found in MGT_Range_Results, and an alternative file with n=10000 was also not found.")
+    else:
+        raise FileNotFoundError(f"The file {mgt_file_name} was not found in the MGT_Range_Results directory.")
+
 
 def find_mgt_csv(dataset_name, n, relevance_definition=None, diversity_definition=None, create_if_not_exists=True):
     if diversity_definition is None:

@@ -3,17 +3,18 @@ from read_data_movies import read_data, merge_plots
 from Ranking import find_top_k, store_results
 from utilities import RELEVANCE, DIVERSITY, NAIVE, MAX_PROB, EXACT_BASELINE, get_unique_filename
 
-# experiments = [(15, 2), (64, 2)]  
-experiments = [(45, 2), (64, 2), (90, 2), (142, 2), (201, 2)]  
+experiments = [(15, 2)]  
+#experiments = [(45, 2), (64, 2), (90, 2), (142, 2), (201, 2)]  
 dataset_name = "movies"
 input_query = "A scary movie"
-# relevance_definition = "Popularity" 
-# diversity_definition = "Genre_and_movie_periods"
-relevance_definition = "Brief_plot" 
-diversity_definition = "Different_years"
+relevance_definition = "Popularity" 
+diversity_definition = "Genre_and_movie_periods"
+# relevance_definition = "Brief_plot" 
+# diversity_definition = "Different_years"
 use_filtered_init_candidates = False
 independence_assumption = True
 report_entropy_in_naive = False
+is_multiple_llms = True
 use_MGTs = True
 metrics = [RELEVANCE, DIVERSITY]
 methods = [MAX_PROB, NAIVE, EXACT_BASELINE]  
@@ -37,7 +38,7 @@ with open(output_file, mode='w', newline='') as file:
 all_results = []
 for (n, k) in experiments:
     data = merge_plots(read_data(n=n))
-    results = find_top_k(input_query=input_query, documents=data, k=k, metrics=metrics, methods=methods, mock_llms=False, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs, report_entropy_in_naive=report_entropy_in_naive, use_filtered_init_candidates=use_filtered_init_candidates, independence_assumption=independence_assumption)
+    results = find_top_k(input_query=input_query, documents=data, k=k, metrics=metrics, methods=methods, mock_llms=False, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs, report_entropy_in_naive=report_entropy_in_naive, use_filtered_init_candidates=use_filtered_init_candidates, independence_assumption=independence_assumption, is_multiple_llms=is_multiple_llms)
     all_results.extend(results)
     with open(output_file, mode='a', newline='') as file:
         writer = csv.writer(file)

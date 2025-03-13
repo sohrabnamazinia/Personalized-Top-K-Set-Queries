@@ -5,19 +5,20 @@ from utilities import RELEVANCE, DIVERSITY, NAIVE, MAX_PROB, EXACT_BASELINE, get
 
 # List of (n, k) tuples for experimentation
 # experiments = [(15, 2), (64, 2)]  
-experiments = [(1000, 2), (1000, 4), (1000, 6), (1000, 8), (1000, 10)] 
+experiments = [(15, 2)] 
 dataset_name = "hotels"
 input_query = "Affordable hotel"
 # relevance_definition = "Rating_of_the_hotel"
 # diversity_definition = "Physical_distance_of_the_hotels"
-relevance_definition = "Distance_from_city_center"
-diversity_definition = "Star_rating"
+relevance_definition = "Rating_of_the_hotel"
+diversity_definition = "Physical_distance_of_the_hotels"
 metrics = [RELEVANCE, DIVERSITY]
 use_MGTs = True
 independence_assumption = False
 use_filtered_init_candidates = True
 report_entropy_in_naive = False
-methods = [MAX_PROB]  
+is_multiple_llms = True
+methods = [MAX_PROB, NAIVE, EXACT_BASELINE]  
 output_name = "Results_Hotels_REL_" + relevance_definition + "_DIV_" + diversity_definition
 output_file = get_unique_filename(output_name+ ".csv")
 
@@ -36,7 +37,7 @@ with open(output_file, mode='w', newline='') as file:
 all_results = []
 for (n, k) in experiments:
     data = merge_descriptions(read_data(n=n))
-    results = find_top_k(input_query=input_query, documents=data, k=k, metrics=metrics, methods=methods, mock_llms=False, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs, report_entropy_in_naive=report_entropy_in_naive, use_filtered_init_candidates=use_filtered_init_candidates, independence_assumption=independence_assumption)
+    results = find_top_k(input_query=input_query, documents=data, k=k, metrics=metrics, methods=methods, mock_llms=False, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs, report_entropy_in_naive=report_entropy_in_naive, use_filtered_init_candidates=use_filtered_init_candidates, independence_assumption=independence_assumption, is_multiple_llms=is_multiple_llms)
     all_results.extend(results)
     with open(output_file, mode='a', newline='') as file:
         writer = csv.writer(file)

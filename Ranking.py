@@ -9,7 +9,7 @@ import csv
 import random
 import pandas as pd
 import os
-from utilities import RELEVANCE, DIVERSITY, NAIVE, MIN_UNCERTAINTY, MAX_PROB, EXACT_BASELINE, CHATGPT, LLAMA, TopKResult, ComponentsTime, read_documents, init_candidates_set, check_pair_exist, choose_2, compute_exact_scores_baseline, check_prune, find_mgt_csv, load_init_filtered_candidates, init_candidates_set_random_subset
+from utilities import RELEVANCE, DIVERSITY, NAIVE, MIN_UNCERTAINTY, MAX_PROB, EXACT_BASELINE, CHATGPT, LLAMA, TopKResult, ComponentsTime, read_documents, init_candidates_set, check_pair_exist, choose_2, compute_exact_scores_baseline, check_prune, find_mgt_csv, load_init_filtered_candidates, init_candidates_set_random_subset, compute_exact_scores_baseline_range, find_mgt_csv_range
 from read_data_hotels import read_data, merge_descriptions
 
 class Metric:
@@ -20,7 +20,7 @@ class Metric:
         self.n = n
         self.m = m
 
-    def set(self, i: int, j: int, value: float):
+    def set(self, i, j, value):
         if 0 <= i < self.n and 0 <= j < self.m:
             self.table[i, j] = value
         else:
@@ -38,7 +38,100 @@ class Metric:
         if self.n > 1:
             mask = np.triu(np.ones((self.n, self.m)), k=1)
             self.table = np.where(mask, self.table, None)
-    
+
+    def call_all_randomized_involved_range(self, documents, query=None, relevance_definition=None, diversity_definition=None, sequential_randomized_length=16668, is_image_type=False, images_directory=None, no_llm_calls=3):
+        mean = 0.57
+        std_dev = 0.1
+        values_choices = [i * 0.1 for i in range(11)]
+
+        # Relevance table
+        if query is not None:
+            relevance_csv = f"MGT_{self.dataset_name}_{self.m}_Rel_{relevance_definition}.csv"
+            with open(relevance_csv, mode='w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(['d', 'value_lower', 'value_upper', 'time_rel'])
+
+                if not is_image_type:
+                    counter = 0
+                    for d in range(self.m):
+                        if counter % 1000 == 0:
+                            print("Rel call for document: " + str(d))
+                        if counter % sequential_randomized_length == 0:
+                            start_time_rel = time.time()
+                            values = [call_llm_relevance(query, d, documents, relevance_definition=relevance_definition) for _ in range(no_llm_calls)]
+                            value_lower = min(values)
+                            value_upper = max(values)
+                            time_rel = time.time() - start_time_rel
+                        else:
+                            base_value = round(random.choice(values_choices), 1)
+                            values = [max(0.0, min(1.0, np.random.normal(base_value, 0.05))) for _ in range(no_llm_calls)]
+                            values = [round(v, 1) for v in values]  # Ensure values match the predefined choices
+                            value_lower = min(values)
+                            value_upper = max(values)
+                            time_rel = np.random.normal(mean, std_dev)
+                            time_rel = min(max(0.1, time_rel), 1.1)
+
+                        self.set(0, d, (value_lower, value_upper))
+                        writer.writerow([d, value_lower, value_upper, time_rel])
+                        counter += 1
+                else:
+                    counter = 0
+                    for d in range(self.m):
+                        if counter % 1000 == 0:
+                            print("Rel call for document: " + str(d))
+                        if counter % sequential_randomized_length == 0:
+                            print("Calling LLM for relevance of document: " + str(d))
+                            start_time_rel = time.time()
+                            values = [call_llm_image(query, d, documents, relevance_definition=relevance_definition, images_directory=images_directory) for _ in range(no_llm_calls)]
+                            value_lower = min(values)
+                            value_upper = max(values)
+                            time_rel = time.time() - start_time_rel
+                        else:
+                            base_value = round(random.choice(values_choices), 1)
+                            values = [max(0.0, min(1.0, np.random.normal(base_value, 0.05))) for _ in range(no_llm_calls)]
+                            values = [round(v, 1) for v in values]
+                            value_lower = min(values)
+                            value_upper = max(values)
+                            time_rel = np.random.normal(mean, std_dev)
+                            time_rel = min(max(0.1, time_rel), 1.1)
+
+                        self.set(0, d, (value_lower, value_upper))
+                        writer.writerow([d, value_lower, value_upper, time_rel])
+                        counter += 1
+
+        # Diversity table
+        else:
+            diversity_csv = f"MGT_{self.dataset_name}_{self.n}_Div_{diversity_definition}.csv"
+            with open(diversity_csv, mode='w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(['d2', 'd1', 'value_lower', 'value_upper', 'time_div'])
+
+                counter = 0
+                for d1 in range(self.n):
+                    for d2 in range(d1):
+                        if counter % 10000 == 0:
+                            print("Div call for documents: " + str(d2) + ", " + str(d1))
+                        if counter % sequential_randomized_length == 0:
+                            print("Calling LLM for documents: " + str(d2) + ", " + str(d1))
+                            start_time_div = time.time()
+                            values = [call_llm_diversity(d1, d2, documents, diversity_definition=diversity_definition) for _ in range(no_llm_calls)]
+                            value_lower = min(values)
+                            value_upper = max(values)
+                            time_div = time.time() - start_time_div
+                        else:
+                            base_value = round(random.choice(values_choices), 1)
+                            values = [max(0.0, min(1.0, np.random.normal(base_value, 0.05))) for _ in range(no_llm_calls)]
+                            values = [round(v, 1) for v in values]
+                            value_lower = min(values)
+                            value_upper = max(values)
+                            time_div = np.random.normal(mean, std_dev)
+                            time_div = min(max(0.1, time_div), 1.1)
+
+                        self.set(d2, d1, (value_lower, value_upper))
+                        writer.writerow([d2, d1, value_lower, value_upper, time_div])
+                        counter += 1
+ 
+   
     def call_all_randomized_involved(self, documents, query=None, relevance_definition=None, diversity_definition=None, sequential_randomized_length = 16668, is_image_type=False, images_directory=None):
         mean = 0.57
         std_dev = 0.1
@@ -179,6 +272,18 @@ def call_all_llms_relevance(input_query, documents, relevance_table, candidates_
         candidates_set, updated_candidates = update_lb_ub_relevance(candidates_set, d, value, k)
     return candidates_set, updated_candidates
 
+def call_all_llms_relevance_MGT_range(dataset_name, relevance_table, candidates_set, k, relevance_definition=None):
+    n = relevance_table.m
+    mgt_df_rel = find_mgt_csv_range(dataset_name=dataset_name, n=n, relevance_definition=relevance_definition)
+    total_time_rel = 0
+    for d in range(n):
+        row = mgt_df_rel.iloc[d]  
+        value_lower, value_upper, time_rel = row['value_lower'], row['value_upper'], row["time_rel"]
+        total_time_rel += time_rel
+        relevance_table.set(0, d, (value_lower, value_upper))
+        candidates_set, updated_candidates = update_lb_ub_relevance_range(candidates_set, d, value_lower, value_upper, k)
+    return candidates_set, updated_candidates, total_time_rel
+
 def call_all_llms_relevance_MGT(dataset_name, relevance_table, candidates_set, k, relevance_definition=None):
     n = relevance_table.m
     mgt_df_rel = find_mgt_csv(dataset_name=dataset_name, n=n, relevance_definition=relevance_definition)
@@ -190,7 +295,6 @@ def call_all_llms_relevance_MGT(dataset_name, relevance_table, candidates_set, k
         relevance_table.set(0, d, value)
         candidates_set, updated_candidates = update_lb_ub_relevance(candidates_set, d, value, k)
     return candidates_set, updated_candidates, total_time_rel
-
 
 def call_llm_relevance(query, d, documents, relevance_definition=None, relevance_table = None, llm_model=CHATGPT):
     # Case: Mocked LLM - d is integer
@@ -222,6 +326,16 @@ def call_llm_diversity(d1, d2, documents, diversity_table = None, diversity_defi
     result = api.call_llm_diversity(documents[d1], documents[d2])
     return result
 
+def call_llm_diversity_MGT_range(d1, d2, mgt_df_div):
+    row_index = int(((d2 * (d2 - 1)) / 2) + (d1))
+    row = mgt_df_div.iloc[row_index]
+    value_lower = row['value_lower']
+    value_upper = row['value_upper']
+    time_div = row['time_div']
+    
+    return value_lower, value_upper, time_div
+
+
 def call_llm_diversity_MGT(d1, d2, mgt_df_div):
     row_index = int(((d2 * (d2 - 1)) / 2) + (d1))
     row = mgt_df_div.iloc[row_index]
@@ -246,6 +360,94 @@ def call_llm_image(query, d, images, relevance_definition=None, relevance_table 
     result = api.call_llm_image(query, image_path)
     return result
 
+def common_ele_range(cand, cand_bound, other, other_bound, div_tab: Metric, rel_tab: Metric):
+    '''Checks for common elements between 2 candidates and accordingly calculates conditional probability'''
+    common = []
+    k = len(cand)
+    denom_div = choose_2(k)  # denominator when the bound was calculated using diversity
+    c1lb, c1ub = cand_bound
+    c2lb, c2ub = other_bound
+
+    # Compute relevance scores using lower and upper bounds
+    rel_c1_lb = sum(map(lambda doc: rel_tab.peek_value(doc)[0], cand)) / k
+    rel_c1_ub = sum(map(lambda doc: rel_tab.peek_value(doc)[1], cand)) / k
+    rel_c2_lb = sum(map(lambda doc: rel_tab.peek_value(doc)[0], other)) / k
+    rel_c2_ub = sum(map(lambda doc: rel_tab.peek_value(doc)[1], other)) / k
+
+    rel_c1_lb *= 10
+    rel_c1_ub *= 10
+    rel_c2_lb *= 10
+    rel_c2_ub *= 10
+
+    for docs in cand:
+        if docs in other:
+            common.append(docs)
+
+    div_c1_lb = 0
+    div_c1_ub = 0
+    denom_c1 = 0
+    div_c2_lb = 0
+    div_c2_ub = 0
+    denom_c2 = 0
+    old_c1lb = c1lb
+    old_c1ub = c1ub
+    old_c2lb = c2lb
+    old_c2ub = c2ub
+
+    if len(common) > 1:
+        for i in range(len(cand)):
+            x = cand[i]
+            for y in cand[i + 1:]:
+                if x in common and y in common and div_tab.peek_value(x, y) is None:
+                    continue
+                
+                div_lb, div_ub = div_tab.peek_value(x, y) if div_tab.peek_value(x, y) is not None else (0, 10)
+                div_c1_lb += div_lb * 10
+                div_c1_ub += div_ub * 10
+                denom_c1 += 1
+        
+        c1lb = rel_c1_lb + div_c1_lb / denom_c1
+        c1ub = rel_c1_ub + div_c1_ub / denom_c1
+
+        for i in range(len(other)):
+            x = other[i]
+            for y in other[i + 1:]:
+                if x in common and y in common and div_tab.peek_value(x, y) is None:
+                    continue
+                
+                div_lb, div_ub = div_tab.peek_value(x, y) if div_tab.peek_value(x, y) is not None else (0, 10)
+                div_c2_lb += div_lb * 10
+                div_c2_ub += div_ub * 10
+                denom_c2 += 1
+        
+        c2lb = rel_c2_lb + div_c2_lb / denom_c2
+        c2ub = rel_c2_ub + div_c2_ub / denom_c2
+
+    # Adjust bounds
+    if math.ceil(c1lb) == math.ceil(c1ub):
+        c1lb = math.ceil(c1lb)
+        c1ub = math.ceil(c1ub)
+    else:
+        c1lb = math.ceil(c1lb)
+        c1ub = math.floor(c1ub)
+
+    if math.ceil(c2lb) == math.ceil(c2ub):
+        c2lb = math.ceil(c2lb)
+        c2ub = math.ceil(c2ub)
+    else:
+        c2lb = math.ceil(c2lb)
+        c2ub = math.floor(c2ub)
+
+    new_c1bnd = (c1lb, c1ub)
+    new_c2bnd = (c2lb, c2ub)
+
+    if (cand_bound[0] > new_c1bnd[0] or cand_bound[1] < new_c1bnd[1] or 
+        other_bound[0] > new_c2bnd[0] or other_bound[1] < new_c2bnd[1]):
+        print("Here2", cand, other, cand_bound, other_bound, new_c1bnd, new_c2bnd, rel_c1_lb, rel_c1_ub, rel_c2_lb, rel_c2_ub)
+
+    return new_c1bnd, new_c2bnd
+
+
 def common_ele(cand, cand_bound, other, other_bound, div_tab:Metric, rel_tab:Metric):
     '''Checks for common elements between 2 candidates and accordingly calculates conditional probability'''
     common = []
@@ -253,15 +455,10 @@ def common_ele(cand, cand_bound, other, other_bound, div_tab:Metric, rel_tab:Met
     denom_div = choose_2(k)  # denominator when the bound was calculated using diversity
     c1lb, c1ub = cand_bound
     c2lb, c2ub = other_bound
-    # print(rel_tab)
     rel_c1 = sum(map(lambda doc: rel_tab.peek_value(doc), cand))/k # relevance score for c1
     rel_c2 = sum(map(lambda doc: rel_tab.peek_value(doc), other))/k # relevance score for c2
     rel_c1 = rel_c1 * 10
     rel_c2 = rel_c2 *10
-    # if math.ceil(rel_c1*10) > c1lb: rel_c1 = c1lb
-    # else: rel_c1 = math.ceil(rel_c1*10)
-    # if math.ceil(rel_c2*10) > c2lb: rel_c2 = c2lb
-    # else: rel_c2 = math.ceil(rel_c2*10)
     for docs in cand:
         if docs in other: common.append(docs)
     # print(k, c1, c2, common)
@@ -286,7 +483,6 @@ def common_ele(cand, cand_bound, other, other_bound, div_tab:Metric, rel_tab:Met
                 div_c1_lb += 0 if div_tab.peek_value(x,y) is None else div_tab.peek_value(x,y)*10
                 div_c1_ub += 10 if div_tab.peek_value(x,y) is None else div_tab.peek_value(x,y)*10
                 denom_c1 += 1
-                # print("Here3",(x,y), div_c1_lb, div_c1_ub, denom_c1)
         c1lb = rel_c1 + div_c1_lb/denom_c1
         c1ub = rel_c1 + div_c1_ub/denom_c1
         for i in range(len(other)):
@@ -298,73 +494,29 @@ def common_ele(cand, cand_bound, other, other_bound, div_tab:Metric, rel_tab:Met
                 div_c2_lb += 0 if div_tab.peek_value(x,y) is None else div_tab.peek_value(x,y)*10
                 div_c2_ub += 10 if div_tab.peek_value(x,y) is None else div_tab.peek_value(x,y)*10
                 denom_c2 += 1
-                # print("Here4",(x,y), div_c2_lb, div_c2_ub, denom_c2)
+               
         c2lb = rel_c2 + div_c2_lb/denom_c2
         c2ub = rel_c2 + div_c2_ub/denom_c2
-        # if old_c1lb > c1lb or old_c1ub < c1ub: print(cand_bound, c1lb, c1ub)
-        # if old_c2lb > c2lb or old_c2ub < c2ub: print(other_bound, c2lb, c2ub)
-        # for i in range(len(common)):
-        #     x = common[i]
-        #     for y in common[i+1:]:
-        #         # print(denom_div)
-        #         if div_tab.peek_value(x,y) is None:
-        #             val = 0
-        #             # print(x,y,c1lb,c2lb, rel_c1, rel_c2)
-        #             # subtracting the rel score from lb and ub, then multiplying them with the denominator for 
-        #             # normalized div score to get the sum of diversity scores, then subtracting the value, after which 
-        #             # dividing the newly obtained sum of div scores without val with the denominator - 1 (Accounting for the val being
-        #             # removed) and then finally adding the rel score again to obtain the new lb without the common element
-        #             # print("here",((c1lb - rel_c1)*denom_div - val),((c2lb - rel_c2)*denom_div - val))
-        #             c1lb = (((c1lb - rel_c1)*denom_div - val)/(denom_div - 1)) + rel_c1
-        #             c2lb = (((c2lb - rel_c2)*denom_div - val)/(denom_div - 1)) + rel_c2
-        #             val = 10
-        #             c1ub = (((c1ub - rel_c1)*denom_div - val)/(denom_div - 1)) + rel_c1
-        #             c2ub = (((c2ub - rel_c2)*denom_div - val)/(denom_div - 1)) + rel_c2
-        #             # if c1lb > c1ub or c2lb > c2ub:
-        #             #     print(cand, other, cand_bound, other_bound, c1lb, c1ub, c2lb, c2ub ,rel_c1, rel_c2)
-        #             if other == (1,2,3,5,8):
-        #                 print(other_bound, c2lb, c2ub, denom_div, rel_c2)
-        #             # if cand == (1,2,3,5,7):
-        #             #     print(cand_bound, c1lb, c1ub, denom_div, rel_c2)
-        #             denom_div = denom_div -1
-                # else:
-                #     val = div_tab.peek_value(x,y)
-                #     print(x,y,val)
-                #     c1lb = (((c1lb - rel_c1)*denom_div - val)/(denom_div - 1)) + rel_c1
-                #     c2lb = (((c2lb - rel_c2)*denom_div - val)/(denom_div - 1)) + rel_c2
-                #     c1ub = (((c1ub - rel_c1)*denom_div - val)/(denom_div - 1)) + rel_c1
-                #     c2ub = (((c2ub - rel_c2)*denom_div - val)/(denom_div - 1)) + rel_c2
+        
                 
     if math.ceil(c1lb) == math.ceil(c1ub): # say when c1lb is 9.1 and c1ub is 9.2, both their ceils are 10, so i cannot take the floor of ub in this case
-        # print("Here")
         c1lb = math.ceil(c1lb)
         c1ub = math.ceil(c1ub)
-    # elif 1 > c1lb - c1ub > 0:
-    #     c1lb = math.floor(c1lb)
-    #     c1ub = math.ceil(c1ub)
     else:
         c1lb = math.ceil(c1lb)
         c1ub = math.floor(c1ub)
     if math.ceil(c2lb) == math.ceil(c2ub):
-        # print("Here2")
         c2lb = math.ceil(c2lb)
         c2ub = math.ceil(c2ub)
-    # elif 1 > c2lb - c2ub > 0:
-    #     c2lb = math.floor(c2lb)
-    #     c2ub = math.ceil(c2ub)
     else:
         c2lb = math.ceil(c2lb)
         c2ub = math.floor(c2ub)
     new_c1bnd = (c1lb, c1ub)
     new_c2bnd = (c2lb, c2ub)
     
-    # if c1lb > c1ub or c2lb > c2ub:
-    # print("Here1",cand, other, cand_bound, other_bound, new_c1bnd, new_c2bnd,rel_c1, rel_c2)
     if (cand_bound[0] > new_c1bnd[0] or cand_bound[1] < new_c1bnd[1] or other_bound[0] > new_c2bnd[0] or other_bound[1] < new_c2bnd[1]):
         print("Here2",cand, other, cand_bound, other_bound, new_c1bnd, new_c2bnd, rel_c1, rel_c2)
-    # if cand == (0,1,2):
-    #     if other == (0,1,4) or other == (0,2,4) or other == (1,2,4):
-    #         print(cand_bound, other_bound, new_c1bnd, new_c2bnd,rel_c1, rel_c2)
+   
     return new_c1bnd, new_c2bnd
 
 def gen_1d(candidates_set:dict):
@@ -378,7 +530,7 @@ def gen_1d(candidates_set:dict):
     # print(oned_table)
     return oned_table
 
-def scoring_func2(cand, all_tables: dict, diversity_table:Metric,relevance_table:Metric):
+def scoring_func2(cand, all_tables: dict, diversity_table:Metric,relevance_table:Metric, is_multiple_llms=True):
     for table_names in all_tables.keys():
         # print(cand, table_names)
         if cand == table_names:
@@ -401,7 +553,10 @@ def scoring_func2(cand, all_tables: dict, diversity_table:Metric,relevance_table
         # print(source_node.keys())
         other_bound = (min(table_v), max(table_v))
         # print(cand_bound, other_bound)
-        cand_bound_new, other_bound_new = common_ele(cand, cand_bound, table_n, other_bound, diversity_table, relevance_table)
+        if is_multiple_llms:
+            cand_bound_new, other_bound_new = common_ele_range(cand, cand_bound, table_n, other_bound, diversity_table, relevance_table)
+        else:
+            cand_bound_new, other_bound_new = common_ele(cand, cand_bound, table_n, other_bound, diversity_table, relevance_table)
         for sigs in source_node.values():  # Iterating through all the nodes and taking the list of signals in them
             # print(len(sigs))
             for sig in sigs: # iterating through the signals at a particular node
@@ -505,7 +660,7 @@ def call_entropy_ind(candidates_set, algorithm= None):
     # print(candidates_set, entropy)
     return round(entropy, 4), probabilities_candidate
 
-def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None, use_MGTs = False, dataset_name=None, use_filtered_init_candidates = False, independence_assumption = False):
+def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None, use_MGTs = False, dataset_name=None, use_filtered_init_candidates = False, independence_assumption = False, is_multiple_llm_calls=True):
     # init candidates set and tables
     algorithm = MAX_PROB
     n = len(documents)
@@ -529,8 +684,14 @@ def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None
     if not use_MGTs:
         candidates_set, _ = call_all_llms_relevance(input_query, documents, relevance_table, candidates_set, k, mocked_tables[0] if mocked_tables is not None else None, relevance_definition=relevance_definition)
     else:
-        mgt_df_div = find_mgt_csv(dataset_name=dataset_name, n=n, diversity_definition=diversity_definition)
-        candidates_set, _, total_time_llm_response_rel = call_all_llms_relevance_MGT(dataset_name=dataset_name, relevance_table=relevance_table, candidates_set=candidates_set, relevance_definition=relevance_definition, k=k)
+        if is_multiple_llm_calls:
+            mgt_df_div = find_mgt_csv_range(dataset_name=dataset_name, n=n, diversity_definition=diversity_definition)
+        else:
+            mgt_df_div = find_mgt_csv(dataset_name=dataset_name, n=n, diversity_definition=diversity_definition)
+        if is_multiple_llm_calls:
+            candidates_set, _, total_time_llm_response_rel = call_all_llms_relevance_MGT_range(dataset_name=dataset_name, relevance_table=relevance_table, candidates_set=candidates_set, relevance_definition=relevance_definition, k=k)
+        else:
+            candidates_set, _, total_time_llm_response_rel = call_all_llms_relevance_MGT(dataset_name=dataset_name, relevance_table=relevance_table, candidates_set=candidates_set, relevance_definition=relevance_definition, k=k)
         total_time_llm_response += total_time_llm_response_rel
     # algorithm
     count = n
@@ -561,12 +722,21 @@ def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None
             value = call_llm_diversity(i, j, documents, diversity_table=mocked_tables[1] if mocked_tables is not None else None, diversity_definition=diversity_definition)
             total_time_llm_response += time.time() - start_time_llm_response
         else:
-            value, time_div = call_llm_diversity_MGT(i, j, mgt_df_div)
+            if is_multiple_llm_calls:
+                value_lower, value_upper, time_div = call_llm_diversity_MGT_range(i, j, mgt_df_div)
+            else:
+                value, time_div = call_llm_diversity_MGT(i, j, mgt_df_div)
             total_time_llm_response += time_div
         count += 1
-        diversity_table.set(i, j, value)
+        if is_multiple_llm_calls:
+            diversity_table.set(i, j, (value_lower, value_upper))
+        else:
+            diversity_table.set(i, j, value)
         start_time_update_bounds = time.time()
-        candidates_set, updated_candidates = update_lb_ub_diversity(candidates_set, (i, j), value, k)
+        if is_multiple_llm_calls:
+            candidates_set, updated_candidates = update_lb_ub_diversity_range(candidates_set, (i, j), value_lower, value_upper, k)
+        else:
+            candidates_set, updated_candidates = update_lb_ub_diversity(candidates_set, (i, j), value, k)
         total_time_update_bounds += time.time() - start_time_update_bounds
         candidates_set = prune(candidates_set, updated_candidates)
         its+=1
@@ -587,7 +757,7 @@ def find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables = None
     return TopKResult(algorithm, candidates_set, componentsTime, count, entropy_over_time) 
 
 
-def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None, use_MGTs = False, dataset_name=None, use_filtered_init_candidates = False):
+def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None, use_MGTs = False, dataset_name=None, use_filtered_init_candidates = False, is_multiple_llm_calls=True):
     # init candidate set and tables
     algorithm = EXACT_BASELINE
     start_time = time.time()
@@ -606,8 +776,14 @@ def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables 
         candidates_set, _ = call_all_llms_relevance(input_query, documents, relevance_table, candidates_set, k, mocked_tables[0] if mocked_tables is not None else None, relevance_definition=relevance_definition)
         total_time_llm_response += time.time() - start_time_llm_response
     else:
-        mgt_df_div = find_mgt_csv(dataset_name=dataset_name, n=n, diversity_definition=diversity_definition)
-        candidates_set, _, total_time_llm_response_rel = call_all_llms_relevance_MGT(dataset_name=dataset_name, relevance_table=relevance_table, candidates_set=candidates_set, relevance_definition=relevance_definition, k=k)
+        if is_multiple_llm_calls:
+            mgt_df_div = find_mgt_csv_range(dataset_name=dataset_name, n=n, diversity_definition=diversity_definition)
+        else:
+            mgt_df_div = find_mgt_csv(dataset_name=dataset_name, n=n, diversity_definition=diversity_definition)
+        if is_multiple_llm_calls:
+            candidates_set, _, total_time_llm_response_rel = call_all_llms_relevance_MGT_range(dataset_name=dataset_name, relevance_table=relevance_table, candidates_set=candidates_set, relevance_definition=relevance_definition, k=k)
+        else:
+            candidates_set, _, total_time_llm_response_rel = call_all_llms_relevance_MGT(dataset_name=dataset_name, relevance_table=relevance_table, candidates_set=candidates_set, relevance_definition=relevance_definition, k=k)
         total_time_llm_response += total_time_llm_response_rel
     count = n
     for i in range(n-1):
@@ -617,9 +793,15 @@ def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables 
                 value = call_llm_diversity(i, j, documents, diversity_table=mocked_tables[1] if mocked_tables is not None else None, diversity_definition=diversity_definition)
                 total_time_llm_response += time.time() - start_time_llm_response
             else:
-                value, time_div = call_llm_diversity_MGT(i, j, mgt_df_div)
+                if is_multiple_llm_calls:
+                    value_lower, value_upper, time_div = call_llm_diversity_MGT_range(i, j, mgt_df_div)
+                else:
+                    value, time_div = call_llm_diversity_MGT(i, j, mgt_df_div)
                 total_time_llm_response += time_div
-            diversity_table.set(i, j, value)
+            if is_multiple_llm_calls:
+                diversity_table.set(i, j, (value_lower, value_upper))
+            else:
+                diversity_table.set(i, j, value)
             
     # entropy = call_entropy(candidates_set, algorithm)
     entropy_dep = call_entropy_discrete_2D(candidates_set,diversity_table,relevance_table, algorithm)
@@ -627,7 +809,10 @@ def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables 
     # print(relevance_table)
     # print(diversity_table)
     #print("*****************************")
-    result = compute_exact_scores_baseline([relevance_table, diversity_table], candidates_set)
+    if is_multiple_llm_calls:
+        result = compute_exact_scores_baseline_range([relevance_table, diversity_table], candidates_set)
+    else:
+        result = compute_exact_scores_baseline([relevance_table, diversity_table], candidates_set)
     #print("Baseline Approach - Exact scores:\n", result)
     # print("Final entropy: ",entropy, entropy_dep)
     print("*****************************")
@@ -635,7 +820,7 @@ def find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables 
     duration = ComponentsTime(total_time=total_time_exclude_llm_calls + total_time_llm_response)
     return TopKResult(algorithm, result, duration, choose_2(n) + n, entropy_dep)
 
-def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None, use_MGTs = False, dataset_name=None, report_entropy=False, use_filtered_init_candidates = False):
+def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, relevance_definition = None, diversity_definition = None, use_MGTs = False, dataset_name=None, report_entropy=False, use_filtered_init_candidates = False, is_multiple_llm_calls=True):
     # init candidate set and tables
     entropy_ind_over_time = []
     entropy_dep_over_time = []
@@ -658,8 +843,14 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, r
     if not use_MGTs:
         candidates_set, _ = call_all_llms_relevance(input_query, documents, relevance_table, candidates_set, k, mocked_tables[0] if mocked_tables is not None else None, relevance_definition=relevance_definition)
     else:
-        mgt_df_div = find_mgt_csv(dataset_name=dataset_name, n=n, diversity_definition=diversity_definition)
-        candidates_set, _, total_time_llm_response_rel = call_all_llms_relevance_MGT(dataset_name=dataset_name, relevance_table=relevance_table, candidates_set=candidates_set, relevance_definition=relevance_definition, k=k)
+        if is_multiple_llm_calls:
+            mgt_df_div = find_mgt_csv_range(dataset_name=dataset_name, n=n, diversity_definition=diversity_definition)
+        else:
+            mgt_df_div = find_mgt_csv(dataset_name=dataset_name, n=n, diversity_definition=diversity_definition)
+        if is_multiple_llm_calls:
+            candidates_set, _, total_time_llm_response_rel = call_all_llms_relevance_MGT_range(dataset_name=dataset_name, relevance_table=relevance_table, candidates_set=candidates_set, relevance_definition=relevance_definition, k=k)
+        else:
+            candidates_set, _, total_time_llm_response_rel = call_all_llms_relevance_MGT(dataset_name=dataset_name, relevance_table=relevance_table, candidates_set=candidates_set, relevance_definition=relevance_definition, k=k)
         total_time_llm_response += total_time_llm_response_rel    
     already_qsd = []
     # print(candidates_set)
@@ -686,11 +877,20 @@ def find_top_k_Naive(input_query, documents, k, metrics, mocked_tables = None, r
             value = call_llm_diversity(i, j, documents, diversity_table=mocked_tables[1] if mocked_tables is not None else None, diversity_definition=diversity_definition)
             total_time_llm_response += time.time() - start_time_llm_response
         else:
-            value, time_div = call_llm_diversity_MGT(i, j, mgt_df_div)
+            if is_multiple_llm_calls:
+                value_lower, value_upper, time_div = call_llm_diversity_MGT_range(i, j, mgt_df_div)
+            else:
+                value, time_div = call_llm_diversity_MGT(i, j, mgt_df_div)
             total_time_llm_response += time_div
-        diversity_table2.set(i, j, value)
+        if is_multiple_llm_calls:
+            diversity_table2.set(i, j, (value_lower, value_upper))
+        else:
+            diversity_table2.set(i, j, value)
         count += 1
-        candidates_set, updated_keys = update_lb_ub_diversity(candidates_set, pair, value, k)
+        if is_multiple_llm_calls:
+            candidates_set, updated_keys = update_lb_ub_diversity_range(candidates_set, pair, value_lower, value_upper, k)
+        else:
+            candidates_set, updated_keys = update_lb_ub_diversity(candidates_set, pair, value, k)
         # prune
         candidates_set = prune(candidates_set, updated_keys)
         if report_entropy:
@@ -773,6 +973,17 @@ def choose_next_llm_diversity_max_prob(diversity_table, candidates_set, probabil
     else:   
         return None  # In case no valid pair is found
 
+def update_lb_ub_relevance_range(candidates_set, d, value_lower, value_upper, k):
+    updated_candidates = []
+    for candidate in candidates_set:
+        if d in candidate:
+            updated_candidates.append(candidate)
+            new_lb = np.round(candidates_set[candidate][0] + (value_lower / k), 3)
+            new_ub = np.round(candidates_set[candidate][1] - ((1 - value_upper) / k), 3)
+            candidates_set[candidate] = (new_lb, new_ub)
+
+    return candidates_set, updated_candidates
+
 
 def update_lb_ub_relevance(candidates_set, d, value, k):
     updated_candidates = []
@@ -781,6 +992,17 @@ def update_lb_ub_relevance(candidates_set, d, value, k):
             updated_candidates.append(candidate)
             new_lb = np.round(candidates_set[candidate][0] + (value / k), 3)
             new_ub = np.round(candidates_set[candidate][1] - ((1 - value) / k), 3)
+            candidates_set[candidate] = (new_lb, new_ub)
+
+    return candidates_set, updated_candidates
+
+def update_lb_ub_diversity_range(candidates_set, pair, value_lower, value_upper, k):
+    updated_candidates = []
+    for candidate in candidates_set:
+        if check_pair_exist(candidate, pair):
+            updated_candidates.append(candidate)
+            new_lb = np.round(candidates_set[candidate][0] + (value_lower / choose_2(k)), 3)
+            new_ub = np.round(candidates_set[candidate][1] - ((1 - value_upper) / choose_2(k)), 3)
             candidates_set[candidate] = (new_lb, new_ub)
 
     return candidates_set, updated_candidates
@@ -810,7 +1032,7 @@ def prune(candidates_set, updated_keys):
             candidates_set.pop(key)
     return candidates_set
 
-def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms = False, is_output_discrete=True, relevance_definition = None, diversity_definition = None, dataset_name = None, use_MGTs = False, report_entropy_in_naive=False, use_filtered_init_candidates=False, independence_assumption=False):
+def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms = False, is_output_discrete=True, relevance_definition = None, diversity_definition = None, dataset_name = None, use_MGTs = False, report_entropy_in_naive=False, use_filtered_init_candidates=False, independence_assumption=False, is_multiple_llms=True):
     results = []
     mocked_tables = None
     n = len(documents)
@@ -827,16 +1049,16 @@ def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms
         # print(mocked_tables)
     
     if EXACT_BASELINE in methods:
-        results.append(find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs, use_filtered_init_candidates=use_filtered_init_candidates))
+        results.append(find_top_k_Exact_Baseline(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs, use_filtered_init_candidates=use_filtered_init_candidates, is_multiple_llm_calls=is_multiple_llms))
 
     if NAIVE in methods:
-        results.append(find_top_k_Naive(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs, report_entropy=report_entropy_in_naive, use_filtered_init_candidates=use_filtered_init_candidates))
+        results.append(find_top_k_Naive(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs, report_entropy=report_entropy_in_naive, use_filtered_init_candidates=use_filtered_init_candidates, is_multiple_llm_calls=is_multiple_llms))
 
     # if MIN_UNCERTAINTY in methods:
         # results.append(find_top_k_Min_Uncertainty(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition))
     
     if MAX_PROB in methods:
-        results.append(find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs, use_filtered_init_candidates=use_filtered_init_candidates, independence_assumption=independence_assumption))
+        results.append(find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs, use_filtered_init_candidates=use_filtered_init_candidates, independence_assumption=independence_assumption, is_multiple_llm_calls=is_multiple_llms))
     
     return results
 
