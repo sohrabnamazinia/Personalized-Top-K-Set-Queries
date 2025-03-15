@@ -4,15 +4,17 @@ from utilities import RELEVANCE, DIVERSITY, CHATGPT, LLAMA
 import time
 
 # Inputs for MGT
-#experiments = [10000] 
-experiments = [15]  
-sequential_randomized_length = 20
-#sequential_randomized_length = 30000
-dataset_name = "hotels"
-input_query = "Affordable hotel"
+experiments = [10000] 
+#experiments = [15]  
+#sequential_randomized_length = 20
+sequential_randomized_length = 50000
+dataset_name = "movies"
+input_query = "A scary movie"
 llm_model = CHATGPT
-relevance_definition = "Rating_of_the_hotel"
-diversity_definition = "Physical_distance_of_the_hotels"
+# relevance_definition = "Rating_of_the_hotel"
+# diversity_definition = "Physical_distance_of_the_hotels"
+relevance_definition = "Brief_plot"
+diversity_definition = "Different_years"
 metrics = [RELEVANCE, DIVERSITY]
 # dataset_name = "movies"
 # input_query = "A scary movie"
