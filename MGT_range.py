@@ -1,14 +1,16 @@
 from read_data_hotels import read_data, merge_descriptions
 from Ranking import Metric
-from utilities import RELEVANCE, DIVERSITY
+from utilities import RELEVANCE, DIVERSITY, CHATGPT, LLAMA
 import time
 
 # Inputs for MGT
+#experiments = [10000] 
 experiments = [15]  
 sequential_randomized_length = 20
-#sequential_randomized_length = 16667
+#sequential_randomized_length = 30000
 dataset_name = "hotels"
 input_query = "Affordable hotel"
+llm_model = CHATGPT
 relevance_definition = "Rating_of_the_hotel"
 diversity_definition = "Physical_distance_of_the_hotels"
 metrics = [RELEVANCE, DIVERSITY]
@@ -24,8 +26,8 @@ for n in experiments:
     diversity_table = Metric(metrics[1], n ,n, dataset_name)
     
     start_time = time.time()
-    relevance_table.call_all_randomized_involved_range(data, input_query, relevance_definition=relevance_definition, sequential_randomized_length = sequential_randomized_length)
-    diversity_table.call_all_randomized_involved_range(data, diversity_definition=diversity_definition, sequential_randomized_length = sequential_randomized_length)
+    relevance_table.call_all_randomized_involved_range(data, input_query, relevance_definition=relevance_definition, sequential_randomized_length = sequential_randomized_length, llm_model=llm_model)
+    diversity_table.call_all_randomized_involved_range(data, diversity_definition=diversity_definition, sequential_randomized_length = sequential_randomized_length, llm_model=llm_model)
     duration = time.time() - start_time
 
     print(f"{time.time()}: Experiment for dataset {dataset_name} with n={n}, relevance definition '{relevance_definition}', and diversity definition '{diversity_definition}' is done.")

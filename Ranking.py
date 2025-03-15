@@ -39,7 +39,7 @@ class Metric:
             mask = np.triu(np.ones((self.n, self.m)), k=1)
             self.table = np.where(mask, self.table, None)
 
-    def call_all_randomized_involved_range(self, documents, query=None, relevance_definition=None, diversity_definition=None, sequential_randomized_length=16668, is_image_type=False, images_directory=None, no_llm_calls=3):
+    def call_all_randomized_involved_range(self, documents, query=None, relevance_definition=None, diversity_definition=None, sequential_randomized_length=16668, is_image_type=False, images_directory=None, no_llm_calls=3, llm_model=CHATGPT):
         mean = 0.57
         std_dev = 0.1
         values_choices = [i * 0.1 for i in range(11)]
@@ -58,7 +58,7 @@ class Metric:
                             print("Rel call for document: " + str(d))
                         if counter % sequential_randomized_length == 0:
                             start_time_rel = time.time()
-                            values = [call_llm_relevance(query, d, documents, relevance_definition=relevance_definition) for _ in range(no_llm_calls)]
+                            values = [call_llm_relevance(query, d, documents, relevance_definition=relevance_definition, llm_model=llm_model) for _ in range(no_llm_calls)]
                             value_lower = min(values)
                             value_upper = max(values)
                             time_rel = time.time() - start_time_rel
@@ -82,7 +82,7 @@ class Metric:
                         if counter % sequential_randomized_length == 0:
                             print("Calling LLM for relevance of document: " + str(d))
                             start_time_rel = time.time()
-                            values = [call_llm_image(query, d, documents, relevance_definition=relevance_definition, images_directory=images_directory) for _ in range(no_llm_calls)]
+                            values = [call_llm_image(query, d, documents, relevance_definition=relevance_definition, images_directory=images_directory, llm_model=llm_model) for _ in range(no_llm_calls)]
                             value_lower = min(values)
                             value_upper = max(values)
                             time_rel = time.time() - start_time_rel
@@ -114,7 +114,7 @@ class Metric:
                         if counter % sequential_randomized_length == 0:
                             print("Calling LLM for documents: " + str(d2) + ", " + str(d1))
                             start_time_div = time.time()
-                            values = [call_llm_diversity(d1, d2, documents, diversity_definition=diversity_definition) for _ in range(no_llm_calls)]
+                            values = [call_llm_diversity(d1, d2, documents, diversity_definition=diversity_definition, llm_model=llm_model) for _ in range(no_llm_calls)]
                             value_lower = min(values)
                             value_upper = max(values)
                             time_div = time.time() - start_time_div
