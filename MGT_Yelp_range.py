@@ -5,19 +5,18 @@ import time
 
 # Inputs for MGT
 experiments = [10000]  
-sequential_randomized_length_relevance = 5000
-sequential_randomized_length_diversity = 50000
+sequential_randomized_length_relevance = 50000
+sequential_randomized_length_diversity = 80000
+# sequential_randomized_length_diversity = 2
 #sequential_randomized_length_diversity = 15000
 dataset_name = "businesses"
 input_query = "Affordable restaurant"
-# relevance_definition = "Type_of_food"
-# diversity_definition = "Open_hours"
-llm_model = CHATGPT
-# dataset_name = "businesses"
-# input_query = "Affordable restaurant"
-relevance_definition = "Location_Around_New_York"
-diversity_definition = "Cost"
+relevance_definition = "Type_of_food"
+diversity_definition = "Open_hours"
+llm_model = LLAMA
 metrics = [RELEVANCE, DIVERSITY]
+# relevance_definition = "Location_Around_New_York"
+# diversity_definition = "Cost"
 images_directory = "dataset_businesses/businesses_photos/"
 
 for n in experiments:

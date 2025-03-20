@@ -15,6 +15,7 @@ class LLMApi:
     prompt_relevance = "The following query and document (review, text, etc) are about an item. Estimate the relevance of the query and the review as a floating point number in a scale of 0.0 to 1.0:\Query: {query}\nReview: {d}\n The definition of the relevance is fully user-defined as follows:{relevance_definition}"
     prompt_diversity = "The following two documents (review, text, etc) are about an item. Estimate the diversity of these two documents as a floating point number in a scale of 0.0 to 1.0:\nDocument 1: {d1}\nDocument 2: {d2}\n The definition of the diversity is fully user-defined as follows:{diversity_definition}"
     # NOTE: set this false if not needed
+    # gpt-4o-mini
     def __init__(self, is_output_discrete=True, relevance_definition="Relevance", diversity_definition="Diversity", image_relevance_definition="Relevance", model_name="gpt-4o-mini") -> None:
         self.model_name = model_name
         #self.model_name = "gpt-4-turbo"

@@ -5,21 +5,23 @@ import time
 
 # Inputs for MGT
 experiments = [10000] 
-#experiments = [15]  
-#sequential_randomized_length = 20
-sequential_randomized_length = 50000
-dataset_name = "movies"
+#experiments = [5]  
+#sequential_randomized_length = 2
+sequential_randomized_length = 80000
+dataset_name = "hotels"
 input_query = "A scary movie"
-llm_model = CHATGPT
-# relevance_definition = "Rating_of_the_hotel"
-# diversity_definition = "Physical_distance_of_the_hotels"
-relevance_definition = "Brief_plot"
-diversity_definition = "Different_years"
+llm_model = LLAMA
+relevance_definition = "Rating_of_the_hotel"
+diversity_definition = "Physical_distance_of_the_hotels"
+#relevance_definition = "Distance_from_city_center"
+#diversity_definition = "Star_rating"
 metrics = [RELEVANCE, DIVERSITY]
 # dataset_name = "movies"
 # input_query = "A scary movie"
 # relevance_definition = "Popularity"
 # diversity_definition = "Genre_and_movie_periods"
+# relevance_definition = "Brief_plot"
+# diversity_definition = "Different_years"
 
 for n in experiments:
     data = merge_descriptions(read_data(n=n))
