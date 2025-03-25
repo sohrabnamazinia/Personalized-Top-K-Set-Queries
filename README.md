@@ -1,6 +1,6 @@
-# Personalized Top-k Set Queries Over Predicted Scores
+# Efficient Prediction of Top-k Recommendations with User-Specified Scoring Functions
 
-This repository contains the source code for the experiments presented in *Personalized Top-k Set Queries Over Predicted Scores*. The project introduces a computational framework to efficiently identify personalized top-k sets using minimal oracle (e.g., LLM) calls.
+This repository contains the source code for the experiments presented in *Efficient Prediction of Top-k Recommendations with User-Specified Scoring Functions*. The project introduces a computational framework to efficiently identify personalized top-k sets using minimal oracle (e.g., LLM) calls.
 
 ## Table of Contents
 - [Overview](#overview)
