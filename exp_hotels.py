@@ -5,7 +5,7 @@ from utilities import RELEVANCE, DIVERSITY, NAIVE, MAX_PROB, EXACT_BASELINE, get
 
 # List of (n, k) tuples for experimentation
 # experiments = [(15, 2), (64, 2)]  
-experiments = [(1000, 2), (1000, 4), (1000, 6), (1000, 8), (1000, 10)] 
+experiments = [(100, 2), (100, 4), (100, 6), (100, 8), (100, 10)] 
 win_threshold = 0.90
 dataset_name = "hotels"
 input_query = "Affordable hotel"
@@ -15,7 +15,7 @@ diversity_definition = "Physical_distance_of_the_hotels"
 # diversity_definition = "Star_rating"
 metrics = [RELEVANCE, DIVERSITY]
 use_MGTs = True
-independence_assumption = True
+independence_assumption = False
 use_filtered_init_candidates = True
 report_entropy_in_naive = False
 is_multiple_llms = True
