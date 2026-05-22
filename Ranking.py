@@ -9,7 +9,7 @@ import csv
 import random
 import pandas as pd
 import os
-from utilities import RELEVANCE, DIVERSITY, NAIVE, MIN_UNCERTAINTY, MAX_PROB, EXACT_BASELINE, CHATGPT, LLAMA, TopKResult, ComponentsTime, read_documents, init_candidates_set, check_pair_exist, choose_2, compute_exact_scores_baseline, check_prune, find_mgt_csv, load_init_filtered_candidates, init_candidates_set_random_subset, compute_exact_scores_baseline_range, find_mgt_csv_range
+from utilities import RELEVANCE, DIVERSITY, NAIVE, MIN_UNCERTAINTY, MAX_PROB, EXACT_BASELINE, GREEDY, CHATGPT, LLAMA, TopKResult, ComponentsTime, read_documents, init_candidates_set, check_pair_exist, choose_2, compute_exact_scores_baseline, check_prune, find_mgt_csv, load_init_filtered_candidates, init_candidates_set_random_subset, compute_exact_scores_baseline_range, find_mgt_csv_range
 from read_data_hotels import read_data, merge_descriptions
 
 class Metric:
@@ -950,6 +950,18 @@ def choose_random_qs(setofdocs, already_qsd):
     already_qsd.append(pair)
     return i, j
 
+def choose_greedy_qs(candidates_set, already_qsd):
+    """Pick candidate with highest upper bound, then random unasked pair from it."""
+    sorted_cands = sorted(candidates_set.keys(), key=lambda c: candidates_set[c][1], reverse=True)
+    for best_candidate in sorted_cands:
+        candidate_pairs = list(itertools.combinations(best_candidate, 2))
+        available = [p for p in candidate_pairs if p not in already_qsd]
+        if available:
+            pair = random.choice(available)
+            already_qsd.append(pair)
+            return pair[0], pair[1]
+    return None
+
 def choose_next_llm_diversity_max_prob(diversity_table, candidates_set, probabilities_cand, determined_qs):       
     # print(probabilities_cand)
     winner_cand = max(probabilities_cand, key=probabilities_cand.get)     
@@ -1056,6 +1068,91 @@ def prune(candidates_set, updated_keys):
             candidates_set.pop(key)
     return candidates_set
 
+def find_top_k_greedy(input_query, documents, k, metrics, mocked_tables=None, relevance_definition=None, diversity_definition=None, use_MGTs=False, dataset_name=None, use_filtered_init_candidates=False, is_multiple_llm_calls=True, win_threshold=0.75):
+    algorithm = GREEDY
+    start_time = time.time()
+    n = len(documents)
+    count = n
+    total_time_llm_response = 0
+    total_time_update_bounds = 0
+    total_time_determine_next_question = 0
+
+    if not use_filtered_init_candidates:
+        candidates_set = init_candidates_set(n, k, 0, len(metrics))
+    else:
+        candidates_set = load_init_filtered_candidates(dataset_name=dataset_name, relevance_definition=relevance_definition, diversity_definition=diversity_definition, k=k)
+
+    original_number_of_candidates = len(candidates_set)
+    relevance_table = Metric(metrics[0], 1, n, dataset_name)
+    diversity_table = Metric(metrics[1], n, n, dataset_name)
+
+    if not use_MGTs:
+        candidates_set, _ = call_all_llms_relevance(input_query, documents, relevance_table, candidates_set, k, mocked_tables[0] if mocked_tables is not None else None, relevance_definition=relevance_definition)
+    else:
+        if is_multiple_llm_calls:
+            mgt_df_div = find_mgt_csv_range(dataset_name=dataset_name, n=n, diversity_definition=diversity_definition)
+            candidates_set, _, total_time_llm_response_rel = call_all_llms_relevance_MGT_range(dataset_name=dataset_name, relevance_table=relevance_table, candidates_set=candidates_set, relevance_definition=relevance_definition, k=k)
+        else:
+            mgt_df_div = find_mgt_csv(dataset_name=dataset_name, n=n, diversity_definition=diversity_definition)
+            candidates_set, _, total_time_llm_response_rel = call_all_llms_relevance_MGT(dataset_name=dataset_name, relevance_table=relevance_table, candidates_set=candidates_set, relevance_definition=relevance_definition, k=k)
+        total_time_llm_response += total_time_llm_response_rel
+
+    already_qsd = []
+    its = 0
+    while len(candidates_set) > 1:
+        if len(candidates_set) <= original_number_of_candidates * (1 - win_threshold):
+            best_candidate = max(candidates_set, key=lambda c: candidates_set[c][1])
+            candidates_set = {best_candidate: candidates_set[best_candidate]}
+            break
+        if its % 10 == 0:
+            print("Greedy: iteration number ", its)
+        its += 1
+
+        start_time_determine = time.time()
+        result = choose_greedy_qs(candidates_set, already_qsd)
+        total_time_determine_next_question += time.time() - start_time_determine
+
+        if result is None:
+            break
+        i, j = result
+
+        if not use_MGTs:
+            start_time_llm = time.time()
+            value = call_llm_diversity(i, j, documents, diversity_table=mocked_tables[1] if mocked_tables is not None else None, diversity_definition=diversity_definition)
+            total_time_llm_response += time.time() - start_time_llm
+        else:
+            if is_multiple_llm_calls:
+                value_lower, value_upper, time_div = call_llm_diversity_MGT_range(i, j, mgt_df_div)
+            else:
+                value, time_div = call_llm_diversity_MGT(i, j, mgt_df_div)
+            total_time_llm_response += time_div
+
+        if is_multiple_llm_calls:
+            diversity_table.set(i, j, (value_lower, value_upper))
+        else:
+            diversity_table.set(i, j, value)
+
+        count += 1
+        start_time_update = time.time()
+        if is_multiple_llm_calls:
+            candidates_set, updated_keys = update_lb_ub_diversity_range(candidates_set, (i, j), value_lower, value_upper, k)
+        else:
+            candidates_set, updated_keys = update_lb_ub_diversity(candidates_set, (i, j), value, k)
+        total_time_update_bounds += time.time() - start_time_update
+        candidates_set = prune(candidates_set, updated_keys)
+
+    print("The best candidate - Greedy approach: \n", candidates_set)
+    total_time_exclude_llm = time.time() - start_time
+    duration = ComponentsTime(
+        total_time_init_candidates_set=0,
+        total_time_update_bounds=total_time_update_bounds,
+        total_time_compute_pdf=0,
+        total_time_determine_next_question=total_time_determine_next_question,
+        total_time_llm_response=total_time_llm_response
+    )
+    return TopKResult(algorithm, candidates_set, duration, count, [])
+
+
 def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms = False, is_output_discrete=True, relevance_definition = None, diversity_definition = None, dataset_name = None, use_MGTs = False, report_entropy_in_naive=False, use_filtered_init_candidates=False, independence_assumption=False, is_multiple_llms=True, win_threshold=0.75):
     results = []
     mocked_tables = None
@@ -1083,7 +1180,10 @@ def find_top_k(input_query, documents, k, metrics, methods, seed = 42, mock_llms
     
     if MAX_PROB in methods:
         results.append(find_top_k_max_prob(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs, use_filtered_init_candidates=use_filtered_init_candidates, independence_assumption=independence_assumption, is_multiple_llm_calls=is_multiple_llms, win_threshold=win_threshold))
-    
+
+    if GREEDY in methods:
+        results.append(find_top_k_greedy(input_query, documents, k, metrics, mocked_tables=mocked_tables, relevance_definition=relevance_definition, diversity_definition=diversity_definition, dataset_name=dataset_name, use_MGTs=use_MGTs, use_filtered_init_candidates=use_filtered_init_candidates, is_multiple_llm_calls=is_multiple_llms, win_threshold=win_threshold))
+
     return results
 
 def store_results(results, output_name=None):
