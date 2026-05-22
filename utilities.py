@@ -6,7 +6,7 @@ import pandas as pd
 from math import comb
 import random
 
-MAX_PROB, MIN_UNCERTAINTY, EXACT_BASELINE, NAIVE = "Max_Prob", "Min_Uncertainty", "Exact_Baseline", "Naive"
+MAX_PROB, MIN_UNCERTAINTY, EXACT_BASELINE, NAIVE, GREEDY = "Max_Prob", "Min_Uncertainty", "Exact_Baseline", "Naive", "Greedy"
 RELEVANCE, DIVERSITY = "relevance", "diversity"
 CHATGPT, LLAMA = "ChatGPT", "LLAMA"
 
