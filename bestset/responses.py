@@ -32,8 +32,8 @@ import numpy as np
 
 from .pmf import GRID_M
 
-SYSTEM = ("Evaluate how well an item (or how diverse a pair of items is) matches "
-          "the user's definition. Output a single float in [0,1] with one decimal.")
+SYSTEM = ("Score how well the item (unary predicate) or the pair of items (binary predicate) "
+          "satisfies the predicate. Output a single float in [0,1] with one decimal.")
 
 # chat-completion endpoints: provider -> (environment variable of the key, base url)
 PROVIDERS = {
@@ -186,7 +186,7 @@ class RecordedResponder:
 
     def prompt(self, key) -> dict:
         p = self.F.predicates[key[0]]
-        text = "Definition: " + p.definition.format(**self.pool.query) + ".\n\n"
+        text = "Predicate: " + p.definition.format(**self.pool.query) + ".\n\n"
         idx = key[1:]
         if p.modality == "image":
             names = [str(self.pool.items.iloc[i]["name"]) for i in idx]

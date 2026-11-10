@@ -57,7 +57,7 @@ def test_pipeline():
             return RecordedResponder(F, pool, models, ResponseStore(path), x=3, workers=4)
 
         prompt = responder().prompt((1, 0, 1))
-        assert "Item 1" in prompt["text"] and "Item 2" in prompt["text"] and "Definition:" in prompt["text"]
+        assert "Item 1" in prompt["text"] and "Item 2" in prompt["text"] and "Predicate:" in prompt["text"]
 
         for prob in ("ind", "dep"):
             run = BestSetRetrieval(F, pool, responder(), k, theta=0.999, prob=prob, top_items=8, seed=0)
