@@ -1,110 +1,93 @@
-# Efficient Prediction of Top-k Recommendations with User-Specified Scoring Functions
+# Best Set Retrieval with Uncertain and Expensive Predicates
 
-This repository contains the source code for the experiments presented in *Efficient Prediction of Top-k Recommendations with User-Specified Scoring Functions*. The project introduces a computational framework to efficiently identify personalized top-k sets using minimal oracle (e.g., LLM) calls.
+A query asks for the best set of `k` items under a scoring function
 
-## Table of Contents
-- [Overview](#overview)
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Running](#running)
-- [Results](#results)
-  - [Cost Analysis](#cost-analysis)
-  - [Scalability Analysis](#scalability-analysis)
+    F(s,u) = Σ_p Σ_{e ∈ s} p(e,u) + Σ_p Σ_{e_i,e_j ∈ s} p(e_i,e_j)
 
+whose unary and binary predicates are evaluated by generative models (LLMs
+for text, VLMs for images). A predicate call is issued `x` times and its
+responses form a PMF. The framework issues as few calls as possible until
+one candidate set is the best set with probability at least θ.
 
-## Overview
+## Layout
 
-In this work, we introduce a framework for answering personalized top-k queries over multi-modal data. Our approach is centered around two key contributions:
+```
+bestset/
+  pmf.py            PMFs on the score grid {0, 0.1, ..., 1}, sum-convolution, bounds
+  scoring.py        scoring functions F1..F6, F1+, F1++, F5+, F5++ and their predicates
+  data.py           item pools of the Hotels, Movies and Yelp datasets
+  responses.py      predicate calls to the models (OpenAI, DeepInfra, Mistral APIs);
+                    the raw responses of every call are recorded and shared by all algorithms
+  candidates.py     candidate sets, score bounds, bound-based and threshold pruning
+  probability.py    winning probabilities: ProbInd and ProbDep
+  nextcall.py       next call: EntrRed, Greedy, Random
+  baselines.py      Exhaustive, LOTUS, TourRank
+  framework.py      the retrieval loop
+  parse_query.py    natural-language query -> scoring function
+experiments/
+  configs.py        models and settings of X1, X3, X4, X5, X8
+  run.py            python -m experiments.run --exp X1
+  collect.py        python -m experiments.collect --F F1 --query 0   (all calls of a pool)
+  x6_scalability.py running time of each component
+  x7_variability.py the same call on the four models: variability, latency, cost
+  plots.py          figures and LaTeX table rows
+  numbers.py        the numbers reported in the text
+scripts/
+  prepare_yelp.py   builds the Yelp files from the Yelp Open Dataset
+  run_all.sh        every experiment in sequence
+tests/              checks that need no model call
+data/README.md      sources of the three datasets
+```
 
-1. **Personalization**: We utilize scoring functions that can be decomposed into individual components, with each component having user-defined definitions. This flexibility allows the scoring function to be tailored to the preferences and needs of each user, making the ranking process more personalized.
+## Setup
 
-2. **Efficiency**: We leverage Large Language Models (LLMs) to evaluate data based on the personalized scoring function. More importantly, we minimize the computational cost associated with LLMs. Here, cost is defined by the number of LLM calls required to return the top-k results, and our framework aims to reduce this number, enhancing efficiency while maintaining accuracy.
+```
+pip install -r requirements.txt
+```
 
-## Requirements
-- Python 3.11 or above
-- Required libraries:
-  - LangChain
-  - NumPy
-  - Matplotlib
+Place the datasets in `data/` (see `data/README.md`) and the API keys in a
+`.env` file in the repository root:
 
-## Installation
-To get started with the framework, follow these steps:
+```
+OPENAI_API_KEY=...
+DEEPINFRA_API_KEY=...
+MISTRAL_API_KEY=...
+```
 
-1. **Clone the Repository**:  
-   ```bash
-   git clone https://github.com/sohrabnamazinia/Personalized-Top-K-Set-Queries
-2. **Install the libraries**:
-   ```bash
-   pip install Langhain
-   pip install Numpy
-   pip install Matplotlib
+## Running
 
-3. **Optional: Configure API Keys for LLMs**:  
-   Ourframework has the option to either call LLMs in real time or to use the pre-stored results of LLM calls done by us for materializing the ground truth. If you want to use the first option, follow these steps to create and configure the key:
+```
+scripts/run_all.sh                    # all experiments, figures and tables
+python -m experiments.run --exp X1    # one experiment
+python -m experiments.plots
+python -m experiments.numbers
+python -m pytest tests                # no model call
+```
 
-   1. Go to the [OpenAI API Key Creation Page](https://platform.openai.com/account/api-keys).
-   2. Sign in or create an account if you don't have one.
-   3. Once logged in, click on "Create new secret key" to generate your API key.
-   4. Copy the generated key.
+`--llm` and `--vlm` choose the models (`gpt-6-luna` or `llama-4-scout`,
+`qwen3-vl` or `mistral-large`); `--n` sets the pool size.
 
-   After obtaining your API key, export it as an environment variable by running the following command in your terminal:
+The first time a predicate call is needed on a pool, its `x` responses are
+requested from the model and recorded in `responses/`. Every algorithm and
+every experiment on that pool reads the recorded responses, so all methods
+are compared on the same raw responses, and a re-run sends no call twice.
+`experiments.collect` records every call of a pool in advance (Exhaustive).
 
-   ```bash
-   export OPENAI_API_KEY="your_api_key_here"  # On Windows: set OPENAI_API_KEY=your_api_key_here
+## Experiments
 
+| | experiment | setting |
+|---|---|---|
+| X1 | predicate calls vs. k | F1, F3, F5; k = 3, 5, 7; all algorithms; 10 queries |
+| X3 | number of predicates | F1, F1+, F1++, F5, F5+, F5++; k = 5; 5 queries |
+| X4 | variability of the responses | ε = 0 to 0.2; F1, F5; k = 5; 5 queries |
+| X5 | threshold θ | θ = 0.7 to 0.999; F1, F3; k = 7; 5 queries |
+| X6 | running time of the components | M = 100 to 100,000 candidate sets |
+| X7 | model comparison | one predicate, 50 Yelp businesses, x = 5, four models |
+| X8 | pruning | bound-based vs. threshold pruning (τ); k = 5; 5 queries |
 
-## Running 
-**Run the Environments**:  
-   There are three key runnable files corresponding to the different use cases in our experiments:
+Defaults: pools of 200 items, x = 3, θ = 0.999. Recall is 1 when the returned
+set is the one Exhaustive returns on the same raw responses.
 
-   1. `hotels.py`
-   2. `movies.py`
-   3. `businesses.py`
-
-   After executing each file, a CSV file is generated containing the results for that specific run and use case. Each CSV file will include the output data for the respective experiment configuration.
-
-
-**Input Parameters in Runnable Files**:  
-   The following key input parameters can be adjusted for each run of the framework:
-
-   - `experiments = [(1000, 2), (1000, 4), (1000, 6), (1000, 8), (1000, 10)]`: A list of tuples where each tuple represents (n, k) values where n is the number of entities in that experiment, and k is the number of entities to be returned (top-k set). 
-   - `dataset_name = "hotels"`: Defines the dataset being used (e.g., hotels). It can be either of the following options: "hotels", "movies", "businesses"
-   - `input_query = "Affordable hotel"`: The input query for ranking the data. It is user defined to make the scoring function personalized. 
-   - `relevance_definition = "Distance_from_city_center"`: Defines the relevance criterion. It is user defined to make the scoring function personalized. 
-   - `diversity_definition = "Star_rating"`: Defines the diversity criterion. It is user defined to make the scoring function personalized. 
-   - `metrics = [RELEVANCE, DIVERSITY]`: Specifies the metrics to be used in ranking (e.g., relevance and diversity).
-   - `use_MGTs = True`: Whether to use pre-stored materialzed ground truth (set it to True) or to call LLMs in real time (set it to False). 
-   - `independence_assumption = False`: Whether to assume independence between candidates (ProbInd) or not (ProbDep).
-   - `use_filtered_init_candidates = True`: Whether to use filtered initial candidates alredy stored as the top candidates or not. 
-   - `report_entropy_in_naive = False`: Whether to report entropy in the Random algorithm or not (preferred to set to False).
-   - `methods = [MAX_PROB]`: Specifies the algorithms to be used separately to extract top-k. It can be a list of the following options: MAX_PROB (which is EntrRed), NAIVE (which is Random), and EXACT_BASELINE (which is Baseline).
-
-   You can modify these parameters based on your specific experiment setup.
-
-
-
-   
-
-
-
-## Results
-
-### Cost Analysis
-
-Cost in this context refers to the number of LLM calls made during the execution of the framework. The different methods vary in cost:
-
-- **EntrRedDep**: This method has the lowest cost, as it minimizes LLM calls, making it the most efficient.
-- **EntrRedInd**: This method has a slightly higher cost than EntrRedDep but still remains much more efficient compared to other methods.
-- **Random**: The Random method involves more LLM calls and is significantly more costly than our methods. 
-- **Baseline**: This method incurs the maximum cost, as it requires all possible LLM calls to evaluate every candidate's exact score. 
-
-### Scalability Analysis
-
-Out of the four key components of the framework — **update bounds**, **compute PDF**, **determine next question**, and **LLM response** — three components are fully scalable as the number of candidates increases:
-
-1. **Update bounds**
-2. **Determine next question**
-3. **LLM response**
-
-However, the **compute PDF** component is only scalable when using **ProbInd** with the independence assumption. The **ProbDep** method faces challenges in scalability, especially as the number of candidates grows, which impacts the overall performance when using that method.
-
+Columns of `results/X*.csv`: `exp, dataset, F, ell, k, x, eps, theta, tau,
+layout, M, n_items, algo, seed, calls, recall, time_s, iterations,
+final_prob, best_set, ref_set, gap`.

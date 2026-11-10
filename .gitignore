@@ -1,14 +1,18 @@
-# Ignore specific file
-OPENAI_API_KEY.txt
+# datasets (see data/README.md for the sources)
+data/*
+!data/README.md
 
-# Ignore virtual environment
-llm/
-dataset_hotels/
-dataset_movies/
-dataset_businesses/businesses_photos
-.venv/
+# outputs
+responses/
+results*/
+figures*/
+*.log
+*.csv
+*.pdf
 
-# ignore environ files
+# environment
 .env
-MGT_Results/*
-MGT*.csv
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
