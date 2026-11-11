@@ -32,8 +32,8 @@ DS = {"hotels": "Hotels", "movies": "Movies", "yelp": "Yelp"}
 plt.rcParams.update({"font.size": 7.5, "axes.titlesize": 8, "axes.labelsize": 7.5, "xtick.labelsize": 7, "ytick.labelsize": 7,
                      "legend.fontsize": 6.5, "pdf.fonttype": 42, "axes.linewidth": 0.6, "lines.linewidth": 1.1,
                      "errorbar.capsize": 1.5})
-COL = (3.45, 1.23)      # one-column figure (inches)
-WIDE = (7.0, 1.65)      # two-column figure
+COL = (3.45, 1.12)      # one-column figure (inches)
+WIDE = (7.0, 1.45)      # two-column figure
 def _save(fig, name):
     fig.tight_layout(pad=0.3, w_pad=0.6); fig.savefig(os.path.join(FIGURES, name), bbox_inches="tight", pad_inches=0.02); plt.close(fig)
 
@@ -111,7 +111,7 @@ def fig3(df):
 
 def fig4(df):
     """Predicate calls vs. the variability eps of the responses (x = 3)."""
-    fig, axes = plt.subplots(1, 2, figsize=(COL[0], COL[1] + 0.3))
+    fig, axes = plt.subplots(1, 2, figsize=(COL[0], COL[1] + 0.18))
     look = {"greedy": ("0.6", "s", "--"), "entrred+probdep": ("black", "D", "-")}
     for ax, ds in zip(axes, ["hotels", "yelp"]):
         sub = df[(df.dataset == ds) & (df.x == 3)]
@@ -127,7 +127,7 @@ def fig4(df):
 
 
 def fig5(df):
-    fig, axes = plt.subplots(1, 2, figsize=(COL[0], COL[1] + 0.3))
+    fig, axes = plt.subplots(1, 2, figsize=(COL[0], COL[1] + 0.18))
     look = {"entrred+probind": ("0.6", "s", "--", -0.004), "entrred+probdep": ("black", "D", "-", 0.004)}
     for ax, ds in zip(axes, ["hotels", "movies"]):
         sub = df[df.dataset == ds]
@@ -145,7 +145,7 @@ def fig5(df):
 
 def fig_recall_theta(df):
     """Recall vs. theta (k = 7) of EntrRed+ProbInd and EntrRed+ProbDep."""
-    fig, axes = plt.subplots(1, 2, figsize=(COL[0], COL[1] + 0.3))
+    fig, axes = plt.subplots(1, 2, figsize=(COL[0], COL[1] + 0.18))
     for ax, ds in zip(axes, ["hotels", "movies"]):
         sub = df[df.dataset == ds]
         for algo in ["entrred+probind", "entrred+probdep"]:
