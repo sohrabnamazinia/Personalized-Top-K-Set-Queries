@@ -42,7 +42,7 @@ P = {
     "h_geo_div": Predicate("geo distance", 2, "the hotels are far apart", "text"),
     "h_center": Predicate("proximity to city center", 1, "the hotel is close to the city center", "text"),
     "h_star_div": Predicate("star rating difference", 2, "the hotels differ in star rating", "text"),
-    "h_price_fit": Predicate("price fit", 1, "the price of the hotel fits a budget of {budget}", "text"),
+    "h_afford": Predicate("affordability", 1, "the hotel is affordable for a student traveler", "text"),
     # Movies
     "m_plot": Predicate("brief-plot similarity", 1, "the plot of the movie matches the request: {plot}", "text"),
     "m_year_div": Predicate("production year", 2, "the movies were produced in different years", "text"),
@@ -62,8 +62,8 @@ P = {
 
 SCORING = {
     "F1": ScoringFunction("F1", (P["h_rating"], P["h_geo_div"])),
-    "F1+": ScoringFunction("F1+", (P["h_rating"], P["h_geo_div"], P["h_price_fit"])),
-    "F1++": ScoringFunction("F1++", (P["h_rating"], P["h_geo_div"], P["h_price_fit"], P["h_star_div"])),
+    "F1+": ScoringFunction("F1+", (P["h_rating"], P["h_geo_div"], P["h_afford"])),
+    "F1++": ScoringFunction("F1++", (P["h_rating"], P["h_geo_div"], P["h_afford"], P["h_star_div"])),
     "F2": ScoringFunction("F2", (P["h_center"], P["h_star_div"])),
     "F3": ScoringFunction("F3", (P["m_plot"], P["m_year_div"])),
     "F4": ScoringFunction("F4", (P["m_popularity"], P["m_genre_era_div"])),

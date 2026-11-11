@@ -43,7 +43,7 @@ def x4(d):
 
 
 def x5(d):
-    print("\n== X5: calls and recall per theta (k=5)")
+    print("\n== X5: calls and recall per theta (k=7)")
     print(d.groupby(["dataset", "algo", "theta"]).calls.mean().unstack().round(1).to_string())
     print(d.groupby(["dataset", "algo", "theta"]).recall.mean().unstack().round(3).to_string())
 

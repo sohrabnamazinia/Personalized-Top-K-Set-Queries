@@ -82,7 +82,7 @@ class Reference:
         return set_score(self.rel, self.div, s) >= self.best_score - 1e-9
 
 
-def exhaustive(F, pool, responder, k, top_items=16, **_):
+def exhaustive(F, pool, responder, k, top_items=100, **_):
     n = pool.n
     if hasattr(responder, "prefetch"):
         responder.prefetch([(pi, i, j) for pi, p in enumerate(F.predicates) if p.arity == 2
@@ -93,7 +93,7 @@ def exhaustive(F, pool, responder, k, top_items=16, **_):
     return _best_subset(rel, div, items, k), responder.calls, items
 
 
-def lotus(F, pool, responder, k, top_items=16, **_):
+def lotus(F, pool, responder, k, top_items=100, **_):
     n = pool.n
     n_top = n_candidate_items(k, n, top_items)
     rel = _unary_scores(F, responder, range(n), n)                 # sem_map
@@ -106,7 +106,7 @@ def lotus(F, pool, responder, k, top_items=16, **_):
     return _best_subset(rel, div, items, k), responder.calls, items
 
 
-def tourrank(F, pool, responder, k, top_items=16, g=10, seed=0, **_):
+def tourrank(F, pool, responder, k, top_items=100, g=10, seed=0, **_):
     n = pool.n
     n_top = n_candidate_items(k, n, top_items)
     rng = np.random.default_rng(seed)

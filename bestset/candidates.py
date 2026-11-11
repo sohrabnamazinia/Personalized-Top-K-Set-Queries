@@ -1,13 +1,16 @@
 """Candidate sets, score bounds and pruning.
 
 After the unary predicates have been evaluated on the pool, the candidate
-sets are the k-subsets of the n' items with the largest upper-bound score.
+space is built from the bounds of the unary calls: an item is dropped when
+every set that contains it has an upper bound below the lower bound of
+another set.  ``top_items`` bounds the number of items that are kept (those
+with the largest upper bound); the candidate sets are their k-subsets.
 A candidate set keeps the sum-convolution of the PMFs of its predicate calls
 (a call that has not been issued has a uniform PMF); its lower and upper
 bound are the smallest and the largest score with non-zero mass.
 
-Bound-based pruning removes a set whose upper bound is below the largest
-lower bound.  Threshold pruning (``tau``) also removes the sets whose upper
+Exact pruning removes a set whose upper bound is below the largest
+lower bound.  Heuristic pruning (``tau``) also removes the sets whose upper
 bound is below tau times the largest upper bound.
 """
 from __future__ import annotations
@@ -19,9 +22,26 @@ import numpy as np
 from . import pmf as P
 
 
-def n_candidate_items(k: int, n: int, top_items: int = 16) -> int:
+def n_candidate_items(k: int, n: int, top_items: int = 100) -> int:
     """Number of items the candidate sets are built from (at least k, at most n)."""
     return max(k, min(n, top_items))
+
+
+def viable_items(lb: np.ndarray, ub: np.ndarray, k: int, n_binary: int) -> np.ndarray:
+    """Items that belong to a set whose upper bound is not below the largest lower bound.
+
+    ``lb`` and ``ub`` are the bounds of the items after the unary calls; every
+    binary call is unknown and contributes between 0 and 1 per pair.
+    """
+    best_lb = np.sort(lb)[-k:].sum()
+    slack = n_binary * k * (k - 1) / 2
+    order = np.argsort(-ub, kind="stable")
+    top = ub[order[:k]].sum()
+    in_top = np.zeros(len(ub), dtype=bool)
+    in_top[order[:k]] = True
+    # largest upper bound of a set that contains item i
+    best_with = np.where(in_top, top, top - ub[order[k - 1]] + ub)
+    return np.flatnonzero(best_with + slack >= best_lb - 1e-9)
 
 
 class CandidateSpace:
@@ -81,7 +101,7 @@ class CandidateSpace:
         self._refresh_bounds()
 
     def prune(self, tau: float | None = None) -> int:
-        """Bound-based pruning, and threshold pruning if tau is given; returns the number of sets removed."""
+        """Exact pruning, and heuristic pruning if tau is given; returns the number of sets removed."""
         before = self.alive.sum()
         idx = self.alive_idx()
         leader = idx[np.argmax(self.lb[idx])]

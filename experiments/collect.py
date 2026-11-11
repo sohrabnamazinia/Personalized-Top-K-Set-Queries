@@ -29,15 +29,15 @@ def main():
     ap.add_argument("--n", type=int, default=DEFAULT["n"])
     ap.add_argument("--x", type=int, default=DEFAULT["x"])
     ap.add_argument("--k", type=int, default=5)
-    ap.add_argument("--llm", default="gpt-6-luna", choices=sorted(LLMS))
-    ap.add_argument("--vlm", default="qwen3-vl", choices=sorted(VLMS))
+    ap.add_argument("--llm", default=DEFAULT["llm"], choices=sorted(LLMS))
+    ap.add_argument("--vlm", default=DEFAULT["vlm"], choices=sorted(VLMS))
     ap.add_argument("--workers", type=int, default=16, help="concurrent calls")
     args = ap.parse_args()
     F, dataset = SCORING[args.F], DATASET_OF[args.F]
     models = {"text": ModelClient(*LLMS[args.llm]), "image": ModelClient(*VLMS[args.vlm])}
     for q in args.query:
         pool = load_pool(dataset, args.n, q)
-        store = ResponseStore(store_path(dataset, q, args.n))
+        store = ResponseStore(store_path(dataset, q, args.n, args.llm, args.vlm))
         responder = RecordedResponder(F, pool, models, store, args.x, args.workers)
         best, calls, _ = exhaustive(F, pool, responder, args.k)
         print(f"{args.F} query {q}: {calls} calls, best set {best}", flush=True)

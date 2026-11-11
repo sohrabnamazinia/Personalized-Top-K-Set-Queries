@@ -8,7 +8,7 @@ Expected files (see data/README.md for the sources):
     data/businesses_photos/<photo_id>.jpg
 
 A query is identified by an integer: it fixes the query fields used by the
-predicate definitions (budget, plot request, target area, cuisine) and the
+predicate definitions (plot request, target area, cuisine) and the
 pool of n items the best set is retrieved from.
 """
 from __future__ import annotations
@@ -22,7 +22,6 @@ import pandas as pd
 DATA_DIR = os.environ.get("BESTSET_DATA", os.path.join(os.path.dirname(__file__), "..", "data"))
 MAX_CHARS = 1500     # longest free-text field kept in a prompt
 
-BUDGETS = ["under $80 per night", "$80 to $150 per night", "$150 to $250 per night", "above $250 per night"]
 PLOTS = [
     "a scary movie set in an isolated house",
     "a detective investigates a murder in a small town",
@@ -110,7 +109,7 @@ def load_pool(dataset: str, n: int = 200, query: int = 0) -> Pool:
         countries = countries[countries >= n].index.tolist()
         country = countries[query % len(countries)]
         items = df[df["countyName"] == country].sample(n=n, random_state=query)
-        fields = {"country": country, "budget": BUDGETS[query % len(BUDGETS)]}
+        fields = {"country": country}
     elif dataset == "movies":
         items = _movies().sample(n=n, random_state=query)
         fields = {"plot": PLOTS[query % len(PLOTS)]}

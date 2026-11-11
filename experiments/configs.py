@@ -2,21 +2,21 @@
 
 An experiment is a list of jobs; a job is one run of one algorithm on one
 query.  Defaults: pools of n = 200 items, x = 3, theta = 0.999, candidate
-sets over the 16 items with the largest upper-bound score.
+space built from the bounds of the unary calls, over at most 100 items.
 """
 from __future__ import annotations
 
 from itertools import product
 
-# modality -> (model, provider); the figures use the first model of each family
+# model -> (API model name, provider); by default the first model of each family is used
 LLMS = {"gpt-6-luna": ("gpt-6-luna", "openai"),
         "llama-4-scout": ("meta-llama/Llama-4-Scout-17B-16E-Instruct", "deepinfra")}
 VLMS = {"qwen3-vl": ("Qwen/Qwen3-VL-235B-A22B-Instruct", "deepinfra"),
         "mistral-large": ("mistral-large-latest", "mistral")}
 
-DEFAULT = dict(n=200, x=3, theta=0.999, eps=None, top_items=16, tau=None, layout="dependent")
-QUERIES = list(range(10))
-QUERIES5 = list(range(5))
+DEFAULT = dict(n=200, x=3, theta=0.999, eps=None, top_items=100, tau=None, layout="dependent",
+               llm="gpt-6-luna", vlm="qwen3-vl")
+QUERIES = list(range(10))          # 10 queries per setting
 
 OURS = ["entrred+probind", "entrred+probdep"]
 ALL_ALGOS = ["random", "greedy", "lotus", "tourrank"] + OURS
@@ -32,33 +32,45 @@ def _jobs(exp, F_list, k_list, algos, queries=QUERIES, **over):
 
 
 def x1():   # predicate calls vs k
-    return _jobs("X1", ["F1", "F3", "F5"], [3, 5, 7], ALL_ALGOS)
+    return _jobs("X1", ["F1", "F3", "F5", "F6"], [3, 5, 7], ALL_ALGOS)
+
+
+def xf():   # the other scoring functions with two predicates, k = 5
+    return _jobs("XF", ["F2", "F4"], [5], ALL_ALGOS)
 
 
 def x3():   # number of predicates
-    return _jobs("X3", ["F1", "F1+", "F1++", "F5", "F5+", "F5++"], [5],
-                 ["greedy", "lotus"] + OURS, queries=QUERIES5)
+    return _jobs("X3", ["F1", "F1+", "F1++", "F5", "F5+", "F5++"], [5], ALL_ALGOS)
 
 
 def x4():   # variability of the responses
     jobs = []
     for eps in [0.0, 0.02, 0.05, 0.1, 0.2]:
-        jobs += _jobs("X4", ["F1", "F5"], [5], ["greedy", "entrred+probdep"], queries=QUERIES5, eps=eps)
+        jobs += _jobs("X4", ["F1", "F5"], [5], ["greedy", "entrred+probdep"], eps=eps)
     return jobs
 
 
-def x5():   # threshold theta
+def x5():   # threshold theta: predicate calls and recall
     jobs = []
     for theta in [0.7, 0.8, 0.9, 0.95, 0.99, 0.999]:
-        jobs += _jobs("X5", ["F1", "F3"], [7], OURS, queries=QUERIES5, theta=theta)
+        jobs += _jobs("X5", ["F1", "F3"], [7], OURS, theta=theta)
     return jobs
 
 
-def x8():   # bound-based vs threshold pruning
+def xm():   # end-to-end comparison of the models: each model evaluates every call of a query
+    jobs = []
+    for llm in LLMS:
+        jobs += _jobs("XM", ["F1"], [5], ["entrred+probdep"], llm=llm)
+    for vlm in VLMS:
+        jobs += _jobs("XM", ["F5"], [5], ["entrred+probdep"], vlm=vlm)
+    return jobs
+
+
+def x8():   # exact vs heuristic pruning
     jobs = []
     for tau in [None, 0.96, 0.92, 0.88, 0.82]:
-        jobs += _jobs("X8", ["F1", "F3", "F5"], [5], ["entrred+probdep"], queries=QUERIES5, tau=tau)
+        jobs += _jobs("X8", ["F1", "F3", "F5"], [5], ["entrred+probdep"], tau=tau)
     return jobs
 
 
-EXPERIMENTS = {"X1": x1, "X3": x3, "X4": x4, "X5": x5, "X8": x8}
+EXPERIMENTS = {"X1": x1, "XF": xf, "X3": x3, "X4": x4, "X5": x5, "XM": xm, "X8": x8}
