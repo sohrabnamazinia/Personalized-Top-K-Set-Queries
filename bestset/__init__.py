@@ -5,7 +5,7 @@ scoring      scoring functions and their predicates
 data         item pools of the Hotels, Movies and Yelp datasets
 responses    predicate calls to the generative models, recorded responses
 candidates   candidate sets, score bounds, pruning
-probability  winning probabilities: ProbInd and ProbDep
+probability  bounds on the winning probabilities: ProbInd and ProbDep
 nextcall     selection of the next call: EntrRed, Greedy, Random
 baselines    Exhaustive, LOTUS, TourRank
 framework    the retrieval loop

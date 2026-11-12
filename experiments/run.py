@@ -5,11 +5,12 @@ when the command is run again.  The raw responses of the predicate calls on
 a pool are recorded in responses/<dataset>_q<query>_n<n>_<llm>_<vlm>.json and
 shared by every algorithm and every experiment on that pool and these models.
 
-Recall compares the returned set with the ground truth of the query: the best
-candidate set of the framework (the candidate space built from the bounds
-of the unary calls) on the recorded responses, with every call of these sets
-issued.  LOTUS and TourRank select their own items, so their sets are scored
-against the same ground truth.
+Recall compares the returned set with the ground truth of the query under
+full information: the candidate sets of the framework (the candidate space
+built from the bounds of the unary calls) on the recorded responses, with
+every call of these sets issued.  A returned set is correct when its winning
+probability against these sets is at least theta.  LOTUS and TourRank select
+their own items, so their sets are checked against the same ground truth.
 """
 from __future__ import annotations
 
@@ -78,10 +79,10 @@ def run_job(job, pool, store, models):
                 eps="" if job["eps"] is None else job["eps"], theta=job["theta"],
                 tau="" if job["tau"] is None else job["tau"], layout=job["layout"], llm=job["llm"], vlm=job["vlm"],
                 M=M, n_items=len(items),
-                algo=algo, seed=job["seed"], calls=calls, recall=int(ref.agrees(best)),
+                algo=algo, seed=job["seed"], calls=calls, recall=int(ref.agrees(best, job["theta"])),
                 time_s=round(elapsed, 3), iterations=it, final_prob=round(p, 4),
                 best_set=" ".join(map(str, sorted(best))), ref_set=" ".join(map(str, ref.best_set)),
-                gap=round(ref.best_score - set_score(ref.rel, ref.div, best), 4))
+                gap=round(ref.best_score - set_score(ref.rel, ref.div, best), 4) if best else "")
 
 
 def run_pool(args):

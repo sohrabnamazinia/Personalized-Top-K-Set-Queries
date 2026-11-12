@@ -14,11 +14,6 @@ GRID_M = 11           # number of grid points of a predicate PMF
 STEP = 0.1
 
 
-def uniform_pmf(m: int = GRID_M) -> np.ndarray:
-    """PMF of an unknown predicate: uniform over the m grid points."""
-    return np.full(m, 1.0 / m)
-
-
 def pmf_from_samples(samples, m: int = GRID_M) -> np.ndarray:
     """Turn x repeated responses (floats in [0,1], one decimal) into a PMF."""
     pmf = np.zeros(m)
@@ -48,8 +43,3 @@ def bounds(pmf: np.ndarray):
 
 def mean(pmf: np.ndarray) -> float:
     return float(np.dot(pmf, np.arange(len(pmf)) * STEP))
-
-
-def entropy(p: np.ndarray) -> float:
-    p = p[p > 0]
-    return float(-(p * np.log2(p)).sum())

@@ -6,8 +6,10 @@ A query asks for the best set of `k` items under a scoring function
 
 whose unary and binary predicates are evaluated by generative models (LLMs
 for text, VLMs for images). A predicate call is issued `x` times and its
-responses form a PMF. The framework issues as few calls as possible until
-one candidate set is the best set with probability at least θ.
+responses form a PMF. A call that has not been issued is only known to lie
+in [MIN, MAX], so the winning probability of a candidate set is bounded from
+below and above. The framework issues as few calls as possible until the
+lower bound of one candidate set reaches θ.
 
 ## Layout
 
@@ -19,7 +21,7 @@ bestset/
   responses.py      predicate calls to the models (OpenAI, DeepInfra, Mistral APIs);
                     the raw responses of every call are recorded and shared by all algorithms
   candidates.py     candidate sets, score bounds, exact and heuristic pruning
-  probability.py    winning probabilities: ProbInd and ProbDep
+  probability.py    bounds on the winning probabilities: ProbInd and ProbDep
   nextcall.py       next call: EntrRed, Greedy, Random
   baselines.py      Exhaustive, LOTUS, TourRank
   framework.py      the retrieval loop

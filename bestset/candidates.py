@@ -5,9 +5,11 @@ space is built from the bounds of the unary calls: an item is dropped when
 every set that contains it has an upper bound below the lower bound of
 another set.  ``top_items`` bounds the number of items that are kept (those
 with the largest upper bound); the candidate sets are their k-subsets.
-A candidate set keeps the sum-convolution of the PMFs of its predicate calls
-(a call that has not been issued has a uniform PMF); its lower and upper
-bound are the smallest and the largest score with non-zero mass.
+A call that has not been issued has no PMF, only its range [MIN, MAX].  A
+candidate set therefore keeps two score PMFs: the sum-convolution of the PMFs
+of its issued calls with every other call at MIN (lower-bound score) and at
+MAX (upper-bound score).  Its lower and upper bound are the smallest score of
+the first and the largest score of the second.
 
 Exact pruning removes a set whose upper bound is below the largest
 lower bound.  Heuristic pruning (``tau``) also removes the sets whose upper
@@ -74,30 +76,34 @@ class CandidateSpace:
                 self.cands_of.setdefault(int(q), []).append(ci)
         self.cands_of = {q: np.array(v) for q, v in self.cands_of.items()}
         self.L = (P.GRID_M - 1) * self.n_pred + 1
-        self.pmfs = np.zeros((self.M, self.L))
+        self.lo = np.zeros((self.M, self.L))     # PMF of the lower-bound score
+        self.hi = np.zeros((self.M, self.L))     # PMF of the upper-bound score
+        self.n_unknown = np.zeros(self.M, dtype=int)
         self.alive = np.ones(self.M, dtype=bool)
         self.known = known                       # call id -> PMF of the calls issued so far
-        self._unif = P.uniform_pmf()
         for ci in range(self.M):
-            self.pmfs[ci] = self._score_pmf(ci)
+            self._set_score_pmfs(ci)
         self._refresh_bounds()
 
-    def pred_pmf(self, q: int):
-        return self.known.get(q, self._unif)
-
-    def _score_pmf(self, ci):
-        return P.convolve_all([self.pred_pmf(int(q)) for q in self.pred_ids[ci]])
+    def _set_score_pmfs(self, ci):
+        issued = [self.known[int(q)] for q in self.pred_ids[ci] if int(q) in self.known]
+        pmf = P.convolve_all(issued)
+        self.n_unknown[ci] = self.n_pred - len(issued)
+        shift = (P.GRID_M - 1) * self.n_unknown[ci]          # every unknown call at MAX
+        self.lo[ci] = 0.0
+        self.hi[ci] = 0.0
+        self.lo[ci, :len(pmf)] = pmf
+        self.hi[ci, shift:shift + len(pmf)] = pmf
 
     def _refresh_bounds(self):
-        nz = self.pmfs > 0
-        self.lb = nz.argmax(axis=1) * P.STEP
-        self.ub = (self.L - 1 - nz[:, ::-1].argmax(axis=1)) * P.STEP
+        self.lb = (self.lo > 0).argmax(axis=1) * P.STEP
+        self.ub = (self.L - 1 - (self.hi > 0)[:, ::-1].argmax(axis=1)) * P.STEP
 
     def update(self, q: int):
         """Call q has been issued: refresh the sets that contain it."""
         for ci in self.cands_of.get(q, []):
             if self.alive[ci]:
-                self.pmfs[ci] = self._score_pmf(ci)
+                self._set_score_pmfs(ci)
         self._refresh_bounds()
 
     def prune(self, tau: float | None = None) -> int:
@@ -119,5 +125,13 @@ class CandidateSpace:
     def alive_idx(self):
         return np.flatnonzero(self.alive)
 
-    def means(self):
-        return self.pmfs @ (np.arange(self.L) * P.STEP)
+    def unknown_mask(self, idx) -> np.ndarray:
+        """Boolean matrix (sets in idx) x (calls): the unknown calls of each set."""
+        n_calls = int(self.pred_ids.max()) + 1
+        issued = np.zeros(n_calls, dtype=bool)
+        issued[list(self.known)] = True
+        mask = np.zeros((len(idx), n_calls), dtype=bool)
+        rows = np.repeat(np.arange(len(idx)), self.n_pred)
+        cols = self.pred_ids[idx].ravel()
+        mask[rows, cols] = ~issued[cols]
+        return mask

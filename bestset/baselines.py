@@ -11,7 +11,8 @@ TourRank    tournament ranking: groups of g items, the top half of each
             pair of the remaining items.
 
 Every baseline returns (best set, number of calls, items its candidate sets
-are built from).
+are built from).  ``Reference`` holds the ground truth of a query under full
+information and the winning probability of any set against it.
 """
 from __future__ import annotations
 
@@ -58,28 +59,73 @@ def _best_subset(rel, div, items, k):
 
 
 class Reference:
-    """The set Exhaustive returns on the recorded responses, restricted to the
-    candidate sets of the run under evaluation (the k-subsets of ``items``,
-    or ``sets`` when given).  Only the calls these sets depend on are read."""
+    """Ground truth of a query on the recorded responses, with every call of the
+    candidate sets issued (the k-subsets of ``items``, or ``sets`` when given).
 
-    def __init__(self, F, pool, responder, k, items, sets=None):
+    ``best_set`` is the set Exhaustive returns.  The winning probability of a
+    set is the probability that its score is strictly larger than the score of
+    every other candidate set, under the joint distribution of the response
+    PMFs (a call shared by several sets is one random variable); it is
+    evaluated on ``n_samples`` joint draws.
+    """
+
+    def __init__(self, F, pool, responder, k, items, sets=None, n_samples=2000, seed=0):
         n = pool.n
+        self.F, self.responder, self.n_samples = F, responder, n_samples
         self.rel = _unary_scores(F, responder, range(n), n)
         if sets is None:
-            pairs = list(combinations(sorted(int(i) for i in items), 2))
+            self.sets = list(combinations(sorted(int(i) for i in items), k))
         else:
-            pairs = sorted({pair for s in sets for pair in combinations(sorted(int(i) for i in s), 2)})
+            self.sets = [tuple(sorted(int(i) for i in s)) for s in sets]
+        pairs = sorted({pair for s in self.sets for pair in combinations(s, 2)})
         self.div = _binary_scores(F, responder, pairs, n)
-        if sets is None:
-            self.best_set = _best_subset(self.rel, self.div, items, k)
-        else:
-            self.best_set = max((tuple(int(i) for i in s) for s in sets),
-                                key=lambda s: set_score(self.rel, self.div, s))
+        self.best_set = max(self.sets, key=lambda s: set_score(self.rel, self.div, s))
         self.best_score = set_score(self.rel, self.div, self.best_set)
+        self._rng = np.random.default_rng(seed)
+        self._draws, self._scores = {}, None
 
-    def agrees(self, s) -> bool:
-        """True if s has the score of the best set (sets with equal scores are the same answer)."""
-        return set_score(self.rel, self.div, s) >= self.best_score - 1e-9
+    def _call_draws(self, key) -> np.ndarray:
+        """Joint draws of one call (drawn once, reused by every set that contains it)."""
+        if key not in self._draws:
+            cdf = np.cumsum(P.pmf_from_samples(self.responder.call(key)))
+            u = self._rng.random(self.n_samples)
+            self._draws[key] = np.minimum(np.searchsorted(cdf, u, side="right"), P.GRID_M - 1) * P.STEP
+        return self._draws[key]
+
+    def _set_draws(self, s) -> np.ndarray:
+        s = sorted(int(i) for i in s)
+        out = np.zeros(self.n_samples)
+        for pi, p in enumerate(self.F.predicates):
+            keys = [(pi, i) for i in s] if p.arity == 1 else [(pi, i, j) for i, j in combinations(s, 2)]
+            for key in keys:
+                out = out + self._call_draws(key)
+        return np.round(out, 6)
+
+    def _all_draws(self) -> np.ndarray:
+        if self._scores is None:
+            self._scores = np.stack([self._set_draws(s) for s in self.sets], axis=1)
+        return self._scores
+
+    def winning_probability(self, s) -> float:
+        s = tuple(sorted(int(i) for i in s))
+        rivals = self._all_draws()
+        if s in self.sets:
+            rivals = np.delete(rivals, self.sets.index(s), axis=1)
+        if rivals.shape[1] == 0:
+            return 1.0
+        return float((self._set_draws(s) > rivals.max(axis=1) + 1e-9).mean())
+
+    def qualifying_set(self, theta) -> tuple:
+        """The candidate set whose winning probability is at least theta, or () if there is none."""
+        p = self.winning_probability(self.best_set)
+        return self.best_set if p >= theta else ()
+
+    def agrees(self, s, theta) -> bool:
+        """True if s is a correct answer at theta: its winning probability is at
+        least theta, or no set is returned and no candidate set reaches theta."""
+        if len(s) == 0:
+            return self.qualifying_set(theta) == ()
+        return self.winning_probability(s) >= theta
 
 
 def exhaustive(F, pool, responder, k, top_items=100, **_):

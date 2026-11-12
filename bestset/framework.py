@@ -3,9 +3,11 @@
 1. Issue every unary call on the n items of the pool.
 2. Build the candidate space: drop the items of sets whose upper bound is below
    the lower bound of another set, and take the k-subsets of the kept items.
-3. Repeat: compute the winning probabilities (ProbInd or ProbDep); stop when
-   a candidate set reaches theta; otherwise select the next call (EntrRed,
-   Greedy or Random), issue it, update the PMFs and bounds, prune.
+3. Repeat: compute the bounds LB(c), UB(c) on the winning probabilities
+   (ProbInd or ProbDep); return a candidate set as soon as LB(c) >= theta;
+   stop without an answer when UB(c) < theta for every set; otherwise select
+   the next call (EntrRed, Greedy or Random), issue it, update the score
+   PMFs and bounds, prune.
 """
 from __future__ import annotations
 
@@ -23,13 +25,13 @@ from .probability import ProbDep, prob_ind
 
 @dataclass
 class RunResult:
-    best_set: tuple
+    best_set: tuple            # empty when no candidate set reaches theta
     calls: int
     iterations: int
     M: int
     n_items: int
     time_s: float
-    final_prob: float
+    final_prob: float          # lower bound of the winning probability of the returned set
     timings: dict = field(default_factory=dict)
     pruned_final: int = 0
 
@@ -99,7 +101,7 @@ class BestSetRetrieval:
     def _n_binary(self):
         return sum(p.arity == 2 for p in self.F.predicates)
 
-    def _probs(self, space):
+    def _bounds(self, space):
         if self.prob_name == "dep":
             return self._dep()
         return prob_ind(space)
@@ -112,19 +114,22 @@ class BestSetRetrieval:
             self._dep = ProbDep(space, self.dep_samples, seed=int(self.rng.integers(1 << 31)))
         space.prune(self.tau)
         select = SELECTORS[self.selector_name]
-        it, q = 0, 0
+        it, best = 0, None
         while True:
             t0 = time.perf_counter()
-            probs = self._probs(space)
+            lb, ub = self._bounds(space)
             self.timings["prob"] += time.perf_counter() - t0
             idx = space.alive_idx()
-            best = int(np.argmax(probs))
-            if probs[best] >= self.theta or len(idx) == 1 or it >= self.max_iterations:
+            top = int(np.argmax(lb))
+            if lb[top] >= self.theta:                 # certified
+                best = top
                 break
+            if not (ub >= self.theta).any() or it >= self.max_iterations:
+                break                                 # no candidate set can reach theta
             t0 = time.perf_counter()
-            q = select(space, probs, self.rng)
+            q = select(space, (lb, ub), self.rng, self.theta)
             self.timings["next"] += time.perf_counter() - t0
-            if q < 0:                    # no unknown call is left
+            if q < 0:                                 # no unknown call is left
                 break
             self._ask(q)
             t0 = time.perf_counter()
@@ -134,13 +139,8 @@ class BestSetRetrieval:
             space.prune(self.tau)
             self.timings["bounds"] += time.perf_counter() - t0
             it += 1
-        if q < 0:
-            # every call of the remaining sets has been issued: return the set
-            # with the largest score (ties broken by the winning probability)
-            means = space.means()[idx]
-            top = np.flatnonzero(means >= means.max() - 1e-9)
-            best = int(top[np.argmax(probs[top])])
-        best_set = tuple(int(i) for i in space.sets[idx[best]])
+        best_set = () if best is None else tuple(int(i) for i in space.sets[idx[best]])
+        final = float(lb[top])
         return RunResult(best_set, self.responder.calls, it, space.M, len(space.items),
-                         time.perf_counter() - t_start, float(probs[best]), dict(self.timings),
+                         time.perf_counter() - t_start, final, dict(self.timings),
                          int((~space.alive).sum()))

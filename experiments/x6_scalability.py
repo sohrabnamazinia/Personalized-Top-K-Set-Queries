@@ -1,9 +1,9 @@
 """X6: running time of each component vs. the number of candidate sets M.
 
 Candidate sets over 30 items (k = 5, half of the calls known), M from 100
-to 100,000.  Measures a bound update, the winning probabilities with ProbInd
-and with ProbDep, and the selection of the next call with EntrRed (on the
-ProbInd probabilities) and with Greedy; three repeats, results/X6.csv.
+to 100,000.  Measures a bound update, the winning-probability bounds with
+ProbInd and with ProbDep, and the selection of the next call with EntrRed
+(on the ProbInd bounds) and with Greedy; three repeats, results/X6.csv.
 """
 from __future__ import annotations
 
@@ -25,6 +25,7 @@ from bestset.scoring import SCORING                                 # noqa: E402
 
 RESULTS = os.path.join(os.path.dirname(__file__), "..", "results")
 SIZES = [100, 1000, 10000, 100000]
+THETA = 0.999
 
 
 def build(M, k, rng, known_frac=0.5):
@@ -60,10 +61,10 @@ def main(out=RESULTS, repeats=3, k=5):
                 q = int(rng.choice(space.pred_ids[0]))      # issue one call of the first set
                 space.known[q] = P.pmf_from_samples([0.7, 0.8, 0.7])
                 t0 = time.perf_counter(); space.update(q); rows.append(("bounds", time.perf_counter() - t0))
-                t0 = time.perf_counter(); p_ind = prob_ind(space); rows.append(("probind", time.perf_counter() - t0))
+                t0 = time.perf_counter(); bounds = prob_ind(space); rows.append(("probind", time.perf_counter() - t0))
                 t0 = time.perf_counter(); dep.update(q); dep(); rows.append(("probdep", time.perf_counter() - t0))
-                t0 = time.perf_counter(); entr_red(space, p_ind, rng); rows.append(("entrred", time.perf_counter() - t0))
-                t0 = time.perf_counter(); greedy(space, p_ind, rng); rows.append(("greedy", time.perf_counter() - t0))
+                t0 = time.perf_counter(); entr_red(space, bounds, rng, THETA); rows.append(("entrred", time.perf_counter() - t0))
+                t0 = time.perf_counter(); greedy(space, bounds, rng, THETA); rows.append(("greedy", time.perf_counter() - t0))
                 for comp, t in rows:
                     w.writerow([M, k, rep, comp, round(t, 6)])
                 print(M, rep, {c: round(t, 4) for c, t in rows}, flush=True)
